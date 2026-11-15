@@ -69,6 +69,8 @@ pub fn run(paths: &Paths, on_show: &OnShow) -> Result<Outcome> {
             Ok(Remote::Show) => return Ok(Outcome::Open { about: false }),
             Ok(Remote::About) => return Ok(Outcome::Open { about: true }),
             Ok(Remote::Quit) => return Ok(Outcome::Quit),
+            // Only sent on macOS.
+            Ok(Remote::Reopen) => {}
             Ok(Remote::Next) => worker.send(Command::RotateNow),
             Ok(Remote::ToggleRotation) => {
                 config.rotation.enabled = !config.rotation.enabled;

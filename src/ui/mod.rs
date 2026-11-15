@@ -113,10 +113,13 @@ pub enum Remote {
     Show,
     Next,
     ToggleRotation,
-    #[cfg_attr(not(windows), allow(dead_code))]
+    #[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
     About,
-    #[cfg_attr(not(windows), allow(dead_code))]
+    #[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
     Quit,
+    /// macOS: the app was activated (Dock icon, Spotlight, Finder): bring back a hidden window.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    Reopen,
 }
 
 /// Set when the window was closed to the tray on Linux, where a window cannot be hidden:
@@ -126,8 +129,8 @@ pub static TO_BACKGROUND: std::sync::atomic::AtomicBool = std::sync::atomic::Ato
 
 /// How the app was launched.
 pub struct StartOptions {
-    /// Create a system tray icon (Windows and Linux).
-    #[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+    /// Create a system tray icon (Windows and Linux; on macOS, in the menu bar).
+    #[cfg_attr(not(any(windows, target_os = "linux", target_os = "macos")), allow(dead_code))]
     pub tray: bool,
     /// Open the About box at once (asked for from the tray menu while there was no window).
     pub about: bool,
@@ -249,11 +252,11 @@ pub struct App {
     // background / tray
     remote_tx: std::sync::mpsc::Sender<Remote>,
     remote_rx: std::sync::mpsc::Receiver<Remote>,
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
     tray: Option<crate::tray::Tray>,
     /// A tray icon is there to come back from (on Linux: a panel shows it right now).
     has_tray: bool,
-    #[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+    #[cfg_attr(not(any(windows, target_os = "linux", target_os = "macos")), allow(dead_code))]
     tray_rotation_shown: bool,
     /// What is on disk, so the periodic save only writes when something changed.
     saved_config: Config,
@@ -301,9 +304,9 @@ impl App {
                 ctx.request_repaint();
             }));
         }
-        #[cfg(any(windows, target_os = "linux"))]
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
         let tray = if start.tray {
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             let made = crate::tray::Tray::new(cc.egui_ctx.clone(), remote_tx.clone(), config.accent, config.rotation.enabled);
             #[cfg(target_os = "linux")]
             let made = {
@@ -320,11 +323,11 @@ impl App {
         } else {
             None
         };
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         let has_tray = tray.is_some();
         #[cfg(target_os = "linux")]
         let has_tray = tray.as_ref().is_some_and(|t| t.is_shown());
-        #[cfg(not(any(windows, target_os = "linux")))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
         let has_tray = false;
         if start.minimized && !has_tray {
             cc.egui_ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
@@ -411,15 +414,15 @@ impl App {
             duel: None,
             remote_tx,
             remote_rx,
-            #[cfg(any(windows, target_os = "linux"))]
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
             tray,
             has_tray,
             tray_rotation_shown: config.rotation.enabled,
             saved_config: config.clone(),
             quitting: false,
-            hidden: cfg!(windows) && start.minimized && has_tray,
+            hidden: cfg!(any(windows, target_os = "macos")) && start.minimized && has_tray,
             tray_hint_shown: false,
-            hide_frames: if cfg!(windows) && start.minimized && has_tray { 3 } else { 0 },
+            hide_frames: if cfg!(any(windows, target_os = "macos")) && start.minimized && has_tray { 3 } else { 0 },
             current_keys: vec![],
             displays: vec![],
             shown: Default::default(),
@@ -772,7 +775,7 @@ impl App {
                             };
                             self.toast(ToastKind::Success, format!("{what} {}", wp.display_title()));
                             self.invalidate(&key);
-                            #[cfg(any(windows, target_os = "linux"))]
+                            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
                             if let Some(t) = &self.tray {
                                 t.set_tooltip(&format!("walle — {}", wp.display_title()));
                             }
@@ -1673,7 +1676,7 @@ impl App {
     fn refresh_window_look(&self, ctx: &egui::Context) {
         let accent = self.config.accent;
         ctx.send_viewport_cmd(egui::ViewportCommand::Icon(Some(std::sync::Arc::new(crate::icon::window_icon(accent)))));
-        #[cfg(any(windows, target_os = "linux"))]
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
         if let Some(t) = &self.tray {
             t.set_accent(accent);
         }
@@ -1702,6 +1705,11 @@ impl App {
                     self.apply_config(cfg);
                     self.toast(ToastKind::Info, if on { "Rotation on" } else { "Rotation paused" });
                 }
+                Remote::Reopen => {
+                    if self.hidden && self.hide_frames == 0 {
+                        self.show_window(ctx);
+                    }
+                }
                 Remote::Quit => {
                     self.quitting = true;
                     ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
@@ -1714,7 +1722,7 @@ impl App {
         {
             self.has_tray = self.tray.as_ref().is_some_and(|t| t.is_shown());
         }
-        #[cfg(any(windows, target_os = "linux"))]
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
         if self.tray_rotation_shown != self.config.rotation.enabled {
             self.tray_rotation_shown = self.config.rotation.enabled;
             if let Some(t) = &self.tray {
@@ -1813,9 +1821,17 @@ impl App {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
             self.hidden = true;
+            // Hand the focus on, so that a click on the Dock icon activates walle again.
+            #[cfg(target_os = "macos")]
+            crate::tray::hide_app();
             if !self.tray_hint_shown {
                 self.tray_hint_shown = true;
-                self.toast(ToastKind::Info, "walle keeps running in the tray. Right-click the tray icon to quit.");
+                let hint = if cfg!(target_os = "macos") {
+                    "walle keeps running in the menu bar. Quit it from its menu there, or with Cmd+Q."
+                } else {
+                    "walle keeps running in the tray. Right-click the tray icon to quit."
+                };
+                self.toast(ToastKind::Info, hint);
             }
         }
     }
@@ -1836,6 +1852,8 @@ impl eframe::App for App {
             self.hide_frames -= 1;
             if self.hidden {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                #[cfg(target_os = "macos")]
+                crate::tray::hide_app();
             }
             ctx.request_repaint();
         }

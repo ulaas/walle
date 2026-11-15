@@ -4934,6 +4934,7 @@ version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "block2 0.6.2",
  "chrono",
  "directories",
  "dispatch2",

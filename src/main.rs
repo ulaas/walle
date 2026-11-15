@@ -19,7 +19,7 @@ mod providers;
 mod rotation;
 mod setter;
 mod single_instance;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 mod tray;
 #[cfg(target_os = "linux")]
 #[path = "tray_linux.rs"]
@@ -94,7 +94,7 @@ fn main() -> anyhow::Result<()> {
     };
     #[cfg(not(target_os = "linux"))]
     let about = false;
-    let has_tray = cfg!(any(windows, target_os = "linux"));
+    let has_tray = cfg!(any(windows, target_os = "linux", target_os = "macos"));
     let mut viewport = egui::ViewportBuilder::default()
         .with_title("walle")
         .with_app_id("walle")
@@ -103,7 +103,7 @@ fn main() -> anyhow::Result<()> {
         .with_icon(icon::window_icon(cfg.accent))
         .with_inner_size([1400.0, 900.0])
         .with_min_inner_size([800.0, 500.0]);
-    if minimized && cfg!(windows) {
+    if minimized && cfg!(any(windows, target_os = "macos")) {
         viewport = viewport.with_visible(false);
     }
     let persistence_path = config::Paths::is_isolated().then(|| paths.data_dir.join("app.ron"));

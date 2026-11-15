@@ -742,7 +742,13 @@ impl App {
             ui.add_space(6.0);
             let mut auto = self.autostart_on;
             let label =
-                if cfg!(windows) { "Start walle when I sign in (in the tray)" } else { "Start walle when I log in (in the tray, without a window)" };
+                if cfg!(windows) {
+                    "Start walle when I sign in (in the tray)"
+                } else if cfg!(target_os = "macos") {
+                    "Start walle when I log in (in the menu bar)"
+                } else {
+                    "Start walle when I log in (in the tray, without a window)"
+                };
             if ui.checkbox(&mut auto, label).changed() {
                 match crate::autostart::set_enabled(auto) {
                     Ok(()) => {
@@ -754,7 +760,14 @@ impl App {
                 }
             }
             ui.add_enabled_ui(self.has_tray, |ui| {
-                ui.checkbox(&mut draft.close_to_tray, "Closing the window keeps walle running in the tray")
+                ui.checkbox(
+                    &mut draft.close_to_tray,
+                    if cfg!(target_os = "macos") {
+                        "Closing the window keeps walle running in the menu bar"
+                    } else {
+                        "Closing the window keeps walle running in the tray"
+                    },
+                )
                     .on_disabled_hover_text("No panel in this session shows tray icons (walle offers a StatusNotifierItem)");
             });
             ui.checkbox(&mut draft.check_updates, "Check for a new version once a day").on_hover_text(
