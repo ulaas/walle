@@ -1,0 +1,21 @@
+/target
+*.db
+*.db-*
+
+# Secrets and local configuration
+.env
+.env.*
+*.pem
+*.key
+/config.toml
+
+# Local-only notes and assistant files: kept on disk, never published
+/PLAN.md
+/CLAUDE.md
+/CLAUDE.local.md
+/AGENTS.md
+/SECURITY.md
+/.claude/
+/.cursor/
+/.aider*
+/.github/copilot-instructions.md

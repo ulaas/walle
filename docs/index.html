@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>walle — find the wallpaper you'll actually keep</title>
+<meta name="description" content="walle is a fast, keyboard-driven desktop app for Windows and Linux to browse, shortlist, compare, keep and set wallpapers from nine sources. Free and open source.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0f1115">
+<meta property="og:title" content="walle — find the wallpaper you'll actually keep">
+<meta property="og:description" content="Browse, shortlist, compare, keep and set wallpapers. Free and open source, for Windows and Linux.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://ulaas.github.io/walle/assets/browse.png">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="preload" href="assets/fonts/Inter-600.ttf" as="font" type="font/ttf" crossorigin>
+<script>document.documentElement.className = 'js';</script>
+<style>
+@font-face { font-family: "Inter"; src: url("assets/fonts/Inter-400.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("assets/fonts/Inter-600.ttf") format("truetype"); font-weight: 600 800; font-display: swap; }
+
+:root {
+  --bg: #0f1115;
+  --bg-deep: #0a0b0f;
+  --surface: #16191f;
+  --surface-2: #20242c;
+  --border: #282c35;
+  --text: #e8eaf0;
+  --weak: #a3a9b8;
+  --accent: #9b8ef7;
+  --accent-strong: #b3a8ff;
+  --accent-ink: #14102e;
+  --kept: #4cc77b;
+  --consider: #f0b42c;
+  --reject: #ee5f5f;
+  --glow: rgba(155, 142, 247, .28);
+  --shadow: 0 40px 120px -30px rgba(0, 0, 0, .75), 0 0 0 1px rgba(255, 255, 255, .06);
+  --radius: 14px;
+  --wrap: 1120px;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f5f8;
+    --bg-deep: #e9ebf1;
+    --surface: #ffffff;
+    --surface-2: #eceef2;
+    --border: #dcdfe6;
+    --text: #1a1d25;
+    --weak: #555c6b;
+    --accent: #6459b1;
+    --accent-strong: #534a94;
+    --accent-ink: #ffffff;
+    --kept: #177a43;
+    --consider: #8f5e05;
+    --reject: #b92f2f;
+    --glow: rgba(100, 89, 177, .22);
+    --shadow: 0 40px 100px -40px rgba(40, 36, 90, .45), 0 0 0 1px rgba(20, 20, 40, .08);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 1.0625rem/1.65 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--accent-strong); text-underline-offset: .2em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--accent-strong); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-weight: 600; line-height: 1.1; letter-spacing: -.025em; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.6rem, 7.2vw, 5.4rem); letter-spacing: -.04em; }
+h2 { font-size: clamp(1.9rem, 4.2vw, 3.1rem); }
+h3 { font-size: 1.2rem; letter-spacing: -.01em; }
+p { margin: 0; text-wrap: pretty; }
+.wrap { width: min(100% - 2.5rem, var(--wrap)); margin-inline: auto; }
+.lede { font-size: clamp(1.1rem, 1.9vw, 1.35rem); color: var(--weak); max-width: 40em; }
+.eyebrow {
+  font-size: .8rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent-strong); margin-bottom: 1rem;
+}
+.skip {
+  position: absolute; left: 1rem; top: -4rem; z-index: 100; padding: .7rem 1rem;
+  background: var(--accent); color: var(--accent-ink); border-radius: 8px; font-weight: 600; text-decoration: none;
+}
+.skip:focus { top: 1rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---------- header ---------- */
+.site-header {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid transparent; transition: border-color .3s;
+}
+.site-header.stuck { border-bottom-color: var(--border); }
+.site-header .wrap { display: flex; align-items: center; gap: 1.5rem; min-height: 64px; }
+.brand { display: inline-flex; align-items: center; gap: .6rem; font-weight: 600; font-size: 1.15rem; color: var(--text); text-decoration: none; letter-spacing: -.02em; }
+.brand img { width: 30px; height: 30px; }
+.site-nav { margin-left: auto; }
+.site-nav ul { display: flex; align-items: center; gap: .25rem; list-style: none; margin: 0; padding: 0; }
+.site-nav a { display: block; padding: .5rem .8rem; color: var(--weak); text-decoration: none; border-radius: 8px; font-size: .95rem; }
+.site-nav a:hover { color: var(--text); background: var(--surface-2); }
+@media (max-width: 720px) { .site-nav .opt { display: none; } }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+  min-height: 48px; padding: .75rem 1.35rem; border-radius: 12px;
+  font: inherit; font-weight: 600; text-decoration: none; border: 1px solid transparent; cursor: pointer;
+  transition: transform .2s, box-shadow .2s, background-color .2s;
+}
+.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 10px 34px -10px var(--glow); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 40px -10px var(--glow); }
+.btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn-ghost:hover { background: var(--surface-2); }
+.site-nav .btn { min-height: 40px; padding: .45rem 1rem; color: var(--accent-ink); margin-left: .5rem; }
+.site-nav .btn:hover { background: var(--accent); color: var(--accent-ink); }
+
+/* ---------- hero ---------- */
+.hero { position: relative; padding: clamp(3.5rem, 9vw, 7rem) 0 0; text-align: center; }
+.hero::before {
+  content: ""; position: absolute; inset: -12rem 0 auto; height: 60rem; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(42rem 26rem at 50% 30%, var(--glow), transparent 70%),
+    radial-gradient(30rem 20rem at 18% 12%, rgba(76, 199, 123, .10), transparent 70%),
+    radial-gradient(30rem 20rem at 84% 16%, rgba(240, 180, 44, .09), transparent 70%);
+}
+.hero .logo { width: 84px; height: 84px; margin: 0 auto 1.75rem; filter: drop-shadow(0 18px 36px var(--glow)); }
+.hero h1 span { color: var(--accent-strong); }
+.hero .lede { margin: 1.5rem auto 0; }
+.cta { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: center; margin-top: 2.25rem; }
+.hero .note { margin-top: 1.25rem; font-size: .92rem; color: var(--weak); }
+
+.stage { perspective: 1800px; margin-top: clamp(3rem, 7vw, 5rem); padding-bottom: clamp(3rem, 8vw, 6rem); }
+.window {
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  background: var(--surface); transform-origin: 50% 0;
+  transform: rotateX(var(--tilt, 0deg)) scale(var(--scale, 1));
+  will-change: transform;
+}
+.window img { width: 100%; }
+
+/* ---------- sections ---------- */
+section { padding: clamp(4rem, 10vw, 8rem) 0; }
+.section-head { max-width: 46rem; margin-bottom: clamp(2.5rem, 5vw, 4rem); }
+.section-head p { margin-top: 1.1rem; }
+.band { background: var(--bg-deep); border-block: 1px solid var(--border); }
+
+/* the flow */
+.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(5, 1fr); counter-reset: step; }
+.flow li {
+  position: relative; counter-increment: step; padding: 1.4rem 1.25rem 1.5rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.flow li::before {
+  content: counter(step, decimal-leading-zero); display: block; font-size: .8rem; font-weight: 600;
+  letter-spacing: .1em; color: var(--weak); margin-bottom: 1.6rem;
+}
+.flow h3 { display: flex; align-items: center; gap: .55rem; }
+.flow p { margin-top: .5rem; font-size: .95rem; color: var(--weak); line-height: 1.5; }
+.dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--accent); flex: none; }
+.dot.c { background: var(--consider); } .dot.k { background: var(--kept); } .dot.x { background: var(--reject); }
+@media (max-width: 960px) { .flow { grid-template-columns: repeat(2, 1fr); } .flow li:last-child { grid-column: 1 / -1; } }
+@media (max-width: 480px) { .flow { grid-template-columns: 1fr; } }
+
+/* feature rows */
+.feature { display: grid; gap: clamp(2rem, 5vw, 4.5rem); align-items: center; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.feature + .feature { margin-top: clamp(4rem, 10vw, 8rem); }
+.feature.flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.feature.flip .copy { order: 2; }
+.feature .copy p { margin-top: 1.1rem; color: var(--weak); }
+.feature ul { margin: 1.4rem 0 0; padding: 0; list-style: none; display: grid; gap: .7rem; }
+.feature li { padding-left: 1.6rem; position: relative; }
+.feature li::before { content: ""; position: absolute; left: 0; top: .62em; width: .7rem; height: 2px; background: var(--accent); border-radius: 2px; }
+@media (max-width: 900px) { .feature, .feature.flip { grid-template-columns: 1fr; } .feature.flip .copy { order: 0; } }
+
+/* theme comparison */
+.compare-themes { position: relative; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); --split: 50%; }
+.compare-themes img { width: 100%; }
+.compare-themes .top { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--split)); }
+.compare-themes .divider { position: absolute; top: 0; bottom: 0; left: var(--split); width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
+.compare-themes .divider::after {
+  content: "\2194"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; font-weight: 600; box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+}
+.compare-themes input {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize;
+}
+.compare-themes:has(input:focus-visible) { outline: 3px solid var(--accent-strong); outline-offset: 4px; }
+.caption { margin-top: 1rem; font-size: .92rem; color: var(--weak); text-align: center; }
+
+/* sources */
+.sources { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 860px) { .sources { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .sources { grid-template-columns: 1fr; } }
+.sources li { padding: 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); transition: transform .25s, border-color .25s; }
+.sources li:hover { transform: translateY(-3px); border-color: var(--accent); }
+.sources p { margin-top: .4rem; font-size: .93rem; color: var(--weak); line-height: 1.5; }
+.tag { display: inline-block; margin-top: .9rem; padding: .15rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 600; letter-spacing: .04em; background: var(--surface-2); color: var(--weak); }
+.tag.free { color: var(--kept); }
+
+/* keys */
+.keys { display: grid; gap: .75rem 2.5rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 0; }
+.keys div { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border); }
+.keys dt { color: var(--weak); }
+.keys dd { margin: 0; display: flex; gap: .35rem; flex: none; }
+kbd {
+  display: inline-grid; place-items: center; min-width: 2.1rem; height: 2.1rem; padding: 0 .55rem;
+  font: 600 .85rem/1 "Inter", system-ui, sans-serif; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-bottom-width: 3px; border-radius: 8px;
+}
+
+/* cards */
+.cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.card { padding: 1.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.card p { margin-top: .6rem; color: var(--weak); font-size: .97rem; }
+
+/* made with */
+.made { text-align: center; }
+.made blockquote { margin: 0 auto; max-width: 20em; font-size: clamp(1.7rem, 4.4vw, 3.2rem); font-weight: 600; line-height: 1.15; letter-spacing: -.03em; text-wrap: balance; }
+.made blockquote em { font-style: normal; color: var(--accent-strong); }
+.made p { margin: 1.5rem auto 0; max-width: 38em; color: var(--weak); }
+
+/* get it */
+pre {
+  margin: 0; padding: 1.4rem 1.5rem; overflow-x: auto; text-align: left;
+  background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius);
+  font: 400 .95rem/1.8 ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace; color: var(--text);
+}
+.band pre { background: var(--bg); }
+pre .p { color: var(--weak); user-select: none; }
+.get { display: grid; gap: clamp(2rem, 5vw, 4rem); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
+.get p { margin-top: 1.1rem; color: var(--weak); }
+@media (max-width: 900px) { .get { grid-template-columns: 1fr; } }
+
+footer { padding: 3rem 0 4rem; color: var(--weak); font-size: .92rem; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; }
+footer p { max-width: 44em; }
+
+/* ---------- reveal ---------- */
+.js .reveal { opacity: 0; transform: translateY(28px); transition: opacity .8s cubic-bezier(.2, .7, .2, 1), transform .8s cubic-bezier(.2, .7, .2, 1); transition-delay: var(--d, 0ms); }
+.js .reveal.from-left { transform: translateX(-36px); }
+.js .reveal.from-right { transform: translateX(36px); }
+.js .reveal.zoom { transform: scale(.94); }
+.js .reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .js .reveal { opacity: 1; transform: none; transition: none; }
+  .window { transform: none !important; }
+  .btn, .sources li { transition: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header" id="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="30" height="30">walle</a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li class="opt"><a href="#flow">The flow</a></li>
+        <li class="opt"><a href="#features">Features</a></li>
+        <li class="opt"><a href="#sources">Sources</a></li>
+        <li><a href="#get">Get it</a></li>
+        <li><a class="btn btn-primary" href="https://github.com/ulaas/walle">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <img class="logo reveal zoom" src="assets/logo.svg" alt="" width="84" height="84">
+      <h1 id="hero-title" class="reveal" style="--d:80ms">Find the wallpaper you'll <span>actually keep.</span></h1>
+      <p class="lede reveal" style="--d:160ms">walle is a desktop app to browse, shortlist, compare, keep and set wallpapers. Nine sources, one window, and a workflow built around the hard part: deciding.</p>
+      <div class="cta reveal" style="--d:240ms">
+        <a class="btn btn-primary" href="#get">Get walle</a>
+        <a class="btn btn-ghost" href="https://github.com/ulaas/walle">View the source</a>
+      </div>
+      <p class="note reveal" style="--d:300ms">Free and open source · Windows and Linux · No account, no telemetry</p>
+
+      <div class="stage">
+        <div class="window" id="hero-window">
+          <img src="assets/browse.png" width="1400" height="900" fetchpriority="high"
+               alt="walle's Browse view in the dark theme: a grid of colourful wallpapers with Kept, Considering and On shortlist badges, a Keep button under the pointer, and a detail panel with Set as wallpaper, rating stars, tags and notes.">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="flow" class="band" aria-labelledby="flow-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">The flow</p>
+        <h2 id="flow-title">From a thousand maybes to the one on your desktop.</h2>
+        <p class="lede">Searching is easy. Choosing is not. walle gives every picture a place to be while you make up your mind, and one key to send it there.</p>
+      </div>
+      <ol class="flow">
+        <li class="reveal" style="--d:0ms"><h3><span class="dot" aria-hidden="true"></span>Browse</h3><p>Search a source, scroll without end. What you rejected before never comes back.</p></li>
+        <li class="reveal" style="--d:90ms"><h3><span class="dot c" aria-hidden="true"></span>Consider</h3><p>Press <kbd>C</kbd> and it lands on your shortlist. No tabs, no downloads folder.</p></li>
+        <li class="reveal" style="--d:180ms"><h3><span class="dot" aria-hidden="true"></span>Compare</h3><p>Two at a time, side by side. The winner stays on and meets the next.</p></li>
+        <li class="reveal" style="--d:270ms"><h3><span class="dot k" aria-hidden="true"></span>Keep</h3><p>Press <kbd>K</kbd>. It is downloaded at once and yours offline, with rating, tags and notes.</p></li>
+        <li class="reveal" style="--d:360ms"><h3><span class="dot" aria-hidden="true"></span>Set</h3><p>Press <kbd>Enter</kbd>, or let rotation pick from what you kept.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="features" aria-labelledby="features-title">
+    <div class="wrap">
+      <h2 id="features-title" class="sr-only">Features</h2>
+
+      <div class="feature">
+        <div class="copy reveal from-left">
+          <p class="eyebrow">Compare</p>
+          <h3 style="font-size:clamp(1.6rem,3.2vw,2.4rem)">Winner stays on.</h3>
+          <p>You can't rank forty pictures in your head, but you always know which of two you like better. Compare turns the shortlist into a run of small, easy decisions.</p>
+          <ul>
+            <li>Pick with the arrow keys or a click; undo with Backspace</li>
+            <li>Keep both when it is too close to call</li>
+            <li>You decide what happens to the loser: reject it, unshortlist it or leave it</li>
+          </ul>
+        </div>
+        <div class="window reveal from-right">
+          <img src="assets/compare.png" width="1400" height="900" loading="lazy"
+               alt="Compare mode: two wallpapers side by side, the current favourite on the left and a challenger on the right, with options to reject, unshortlist or leave the loser, and a Keep both button.">
+        </div>
+      </div>
+
+      <div class="feature flip">
+        <div class="copy reveal from-right">
+          <p class="eyebrow">Library</p>
+          <h3 style="font-size:clamp(1.6rem,3.2vw,2.4rem)">A collection, not a downloads folder.</h3>
+          <p>Everything you keep lives in a local library you can really search: by your own tags and notes, rating, orientation, resolution and source.</p>
+          <ul>
+            <li>Works offline: kept wallpapers are saved as originals</li>
+            <li>Spots the same picture across searches and sources</li>
+            <li>Export to JSON and restore by dropping the file on the window</li>
+          </ul>
+        </div>
+        <div class="window reveal from-left">
+          <img src="assets/library.png" width="1400" height="900" loading="lazy"
+               alt="The Library view: kept wallpapers with star ratings and tag counts, filters for minimum rating, orientation and tags on the left, and the selected wallpaper's details on the right.">
+        </div>
+      </div>
+
+      <div class="feature">
+        <div class="copy reveal from-left">
+          <p class="eyebrow">Preview</p>
+          <h3 style="font-size:clamp(1.6rem,3.2vw,2.4rem)">See it at full size first.</h3>
+          <p>Space opens the original. Scroll to zoom, drag to pan, and step through the grid with the arrow keys. Every curation key keeps working, so you never leave the picture to decide about it.</p>
+        </div>
+        <div class="window reveal from-right">
+          <img src="assets/preview.png" width="1400" height="900" loading="lazy"
+               alt="The full-size preview of one wallpaper, with Consider, Keep, Reject and Set wallpaper buttons above it and arrows to the previous and next picture.">
+        </div>
+      </div>
+
+      <div class="feature flip">
+        <div class="copy reveal from-right">
+          <p class="eyebrow">Look</p>
+          <h3 style="font-size:clamp(1.6rem,3.2vw,2.4rem)">Dark or light, in your colour.</h3>
+          <p>Two themes and seven accents, a titlebar that walle draws itself, and an interface that stays out of the way of the pictures.</p>
+        </div>
+        <div class="reveal from-left">
+          <div class="compare-themes" id="themes">
+            <img src="assets/browse-light.png" width="1400" height="900" loading="lazy" alt="walle's Browse view in the light theme.">
+            <img class="top" src="assets/browse.png" width="1400" height="900" loading="lazy" alt="The same Browse view in the dark theme.">
+            <span class="divider" aria-hidden="true"></span>
+            <label class="sr-only" for="split">Slide between the light and the dark theme</label>
+            <input id="split" type="range" min="0" max="100" value="50" step="1">
+          </div>
+          <p class="caption">Drag, or use the arrow keys, to slide between light and dark.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sources" class="band" aria-labelledby="sources-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">Sources</p>
+        <h2 id="sources-title">Nine sources. One grid.</h2>
+        <p class="lede">Each source shows only the filters it really supports. Five need nothing at all; the others take a free key that stays on your machine.</p>
+      </div>
+      <ul class="sources">
+        <li class="reveal" style="--d:0ms"><h3>Wallhaven</h3><p>Full search, tags, colours, toplists, "find similar" and your collections.</p><span class="tag free">Key optional</span></li>
+        <li class="reveal" style="--d:60ms"><h3>Unsplash</h3><p>The curated Wallpapers topic, with photographers credited.</p><span class="tag">Free key</span></li>
+        <li class="reveal" style="--d:120ms"><h3>Pexels</h3><p>The curated feed and full search.</p><span class="tag">Free key</span></li>
+        <li class="reveal" style="--d:180ms"><h3>Pixabay</h3><p>Search by orientation, colour and category.</p><span class="tag">Free key</span></li>
+        <li class="reveal" style="--d:0ms"><h3>Bing Daily</h3><p>The last two weeks of daily pictures, in UHD.</p><span class="tag free">No key</span></li>
+        <li class="reveal" style="--d:60ms"><h3>NASA APOD</h3><p>Astronomy Picture of the Day: the whole archive back to 1995.</p><span class="tag free">No key</span></li>
+        <li class="reveal" style="--d:120ms"><h3>Openverse</h3><p>Openly licensed images from across the web.</p><span class="tag free">No key</span></li>
+        <li class="reveal" style="--d:180ms"><h3>Lorem Picsum</h3><p>A steady stream of photographs.</p><span class="tag free">No key</span></li>
+        <li class="reveal" style="--d:0ms"><h3>Local folders</h3><p>Your own pictures, curated the same way. Drop a folder on the window.</p><span class="tag free">Yours</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section aria-labelledby="keys-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">Keyboard first</p>
+        <h2 id="keys-title">One key per decision.</h2>
+        <p class="lede">Go through a hundred wallpapers without touching the mouse. Everything is a click away too.</p>
+      </div>
+      <dl class="keys reveal">
+        <div><dt>Move through the grid</dt><dd><kbd aria-label="Left">←</kbd><kbd aria-label="Up">↑</kbd><kbd aria-label="Down">↓</kbd><kbd aria-label="Right">→</kbd></dd></div>
+        <div><dt>Full-size preview</dt><dd><kbd>Space</kbd></dd></div>
+        <div><dt>Consider</dt><dd><kbd>C</kbd></dd></div>
+        <div><dt>Keep</dt><dd><kbd>K</kbd></dd></div>
+        <div><dt>Reject</dt><dd><kbd>X</kbd></dd></div>
+        <div><dt>Rate, or clear the rating</dt><dd><kbd>1</kbd>–<kbd>5</kbd><kbd>0</kbd></dd></div>
+        <div><dt>Set as wallpaper</dt><dd><kbd>Enter</kbd></dd></div>
+        <div><dt>Download</dt><dd><kbd>D</kbd></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="desk-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">On the desktop</p>
+        <h2 id="desk-title">It keeps working after you close it.</h2>
+      </div>
+      <div class="cards">
+        <div class="card reveal" style="--d:0ms"><h3>Rotation</h3><p>A new wallpaper on an interval, from what you kept, the shortlist, a tag, a saved search or an online source. No repeats.</p></div>
+        <div class="card reveal" style="--d:80ms"><h3>Effects</h3><p>Blur, dim, saturation, tint and vignette, rendered into a copy. The original is never changed.</p></div>
+        <div class="card reveal" style="--d:160ms"><h3>Dimmer at night</h3><p>The wallpaper turns darker and warmer in the evening and comes back in the morning, over an hour each way.</p></div>
+        <div class="card reveal" style="--d:240ms"><h3>Tray and login</h3><p>Lives in the tray with <em>Next wallpaper</em> one click away, and can start when you sign in.</p></div>
+        <div class="card reveal" style="--d:320ms"><h3>Many desktops</h3><p>Windows, GNOME, KDE Plasma, Cinnamon, MATE, XFCE, LXQt, Sway, Hyprland and gevrek, or your own command.</p></div>
+        <div class="card reveal" style="--d:400ms"><h3>Private by design</h3><p>A local SQLite library, a cache and one config file. No account, no telemetry, nothing to sign up for.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="made" aria-labelledby="made-title">
+    <div class="wrap reveal zoom">
+      <p class="eyebrow" id="made-title">How it was made</p>
+      <blockquote>Developed fully with AI, <em>with a hint of human taste.</em></blockquote>
+      <p>Every line of walle, this page included, was written by an AI. A human chose what it should be, said no a lot, and kept only what felt right. Much like picking a wallpaper.</p>
+    </div>
+  </section>
+
+  <section id="get" class="band" aria-labelledby="get-title">
+    <div class="wrap get">
+      <div class="reveal from-left">
+        <p class="eyebrow">Get it</p>
+        <h2 id="get-title">Three commands.</h2>
+        <p>walle is built from source with a current stable <a href="https://rustup.rs">Rust toolchain</a>. On Linux you also need the usual X11 or Wayland, <code>libxkbcommon</code> and GL libraries.</p>
+        <div class="cta" style="justify-content:flex-start">
+          <a class="btn btn-primary" href="https://github.com/ulaas/walle">Open on GitHub</a>
+          <a class="btn btn-ghost" href="https://github.com/ulaas/walle#readme">Read the docs</a>
+        </div>
+      </div>
+      <pre class="reveal from-right" tabindex="0" aria-label="Build commands"><code><span class="p">$ </span>git clone https://github.com/ulaas/walle.git
+<span class="p">$ </span>cd walle
+<span class="p">$ </span>cargo run --release</code></pre>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>walle is free software under the <a href="https://github.com/ulaas/walle/blob/main/LICENSE">MIT licence</a>. It is not affiliated with the services it browses; pictures belong to their authors. Screenshots show generated pictures. Set in <a href="https://rsms.me/inter/">Inter</a> (SIL OFL 1.1).</p>
+    <p><a href="#top">Back to top</a></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Reveal on scroll
+  var items = document.querySelectorAll('.reveal');
+  if (reduce || !('IntersectionObserver' in window)) {
+    items.forEach(function (el) { el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.12 });
+    items.forEach(function (el) { io.observe(el); });
+  }
+
+  // Header border once the page has scrolled, and the hero window settling flat
+  var header = document.querySelector('.site-header');
+  var win = document.getElementById('hero-window');
+  var ticking = false;
+  function frame() {
+    ticking = false;
+    header.classList.toggle('stuck', window.scrollY > 8);
+    if (reduce) return;
+    var r = win.getBoundingClientRect();
+    var t = Math.min(1, Math.max(0, (r.top - window.innerHeight * 0.18) / (window.innerHeight * 0.7)));
+    win.style.setProperty('--tilt', (t * 16).toFixed(2) + 'deg');
+    win.style.setProperty('--scale', (1 - t * 0.06).toFixed(3));
+  }
+  window.addEventListener('scroll', function () {
+    if (!ticking) { ticking = true; requestAnimationFrame(frame); }
+  }, { passive: true });
+  window.addEventListener('resize', frame);
+  frame();
+
+  // Light / dark slider
+  var split = document.getElementById('split');
+  var themes = document.getElementById('themes');
+  function setSplit() { themes.style.setProperty('--split', split.value + '%'); }
+  split.addEventListener('input', setSplit);
+  setSplit();
+})();
+</script>
+</body>
+</html>

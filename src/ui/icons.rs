@@ -1,0 +1,53 @@
+//! Phosphor icons (https://phosphoricons.com, MIT): the ones walle uses. The fonts are in
+//! `assets/fonts`; to add an icon, add its code point from the Phosphor cheat sheet here.
+#![allow(dead_code)]
+
+pub const APPROXIMATE_EQUALS: &str = "\u{EDAA}";
+pub const ARROWS_CLOCKWISE: &str = "\u{E094}";
+pub const ARROWS_OUT: &str = "\u{E0A2}";
+pub const ARROW_CLOCKWISE: &str = "\u{E036}";
+pub const ARROW_LEFT: &str = "\u{E058}";
+pub const ARROW_RIGHT: &str = "\u{E06C}";
+pub const ARROW_SQUARE_IN: &str = "\u{E5DC}";
+pub const ARROW_SQUARE_OUT: &str = "\u{E5DE}";
+pub const ARROW_UP: &str = "\u{E08E}";
+pub const ARROW_U_UP_LEFT: &str = "\u{E08A}";
+pub const BOOKMARK_SIMPLE: &str = "\u{E0EA}";
+pub const CARET_LEFT: &str = "\u{E138}";
+pub const CARET_RIGHT: &str = "\u{E13A}";
+pub const CHECK: &str = "\u{E182}";
+pub const CHECK_CIRCLE: &str = "\u{E184}";
+pub const CLOCK_COUNTER_CLOCKWISE: &str = "\u{E1A0}";
+pub const COPY: &str = "\u{E1CA}";
+pub const DOWNLOAD_SIMPLE: &str = "\u{E20C}";
+pub const EXPORT: &str = "\u{EAF0}";
+pub const FLOPPY_DISK: &str = "\u{E248}";
+pub const FOLDER: &str = "\u{E24A}";
+pub const FOLDER_OPEN: &str = "\u{E256}";
+pub const GEAR_SIX: &str = "\u{E272}";
+pub const GLOBE: &str = "\u{E288}";
+pub const HEART: &str = "\u{E2A8}";
+pub const IMAGES: &str = "\u{E836}";
+pub const IMAGE_BROKEN: &str = "\u{E7A8}";
+pub const INFO: &str = "\u{E2CE}";
+pub const KEYBOARD: &str = "\u{E2D8}";
+pub const MAGNIFYING_GLASS: &str = "\u{E30C}";
+pub const MONITOR: &str = "\u{E32E}";
+pub const MOON: &str = "\u{E330}";
+pub const PALETTE: &str = "\u{E6C8}";
+pub const PLUGS: &str = "\u{EB56}";
+pub const PLUS: &str = "\u{E3D4}";
+pub const POWER: &str = "\u{E3DA}";
+pub const PUSH_PIN: &str = "\u{E3E2}";
+pub const SCALES: &str = "\u{E750}";
+pub const SHUFFLE: &str = "\u{E422}";
+pub const SKIP_FORWARD: &str = "\u{E5A6}";
+pub const SPARKLE: &str = "\u{E6A2}";
+pub const STAR: &str = "\u{E46A}";
+pub const SUN: &str = "\u{E472}";
+pub const TAG: &str = "\u{E478}";
+pub const TRASH: &str = "\u{E4A6}";
+pub const TRAY: &str = "\u{E4AA}";
+pub const TROPHY: &str = "\u{E67E}";
+pub const WARNING: &str = "\u{E4E0}";
+pub const X: &str = "\u{E4F6}";
