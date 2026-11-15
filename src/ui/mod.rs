@@ -1806,7 +1806,10 @@ impl App {
                     }
                     Err(e) => self.toast(ToastKind::Error, e),
                 },
-                Event::InstallFailed(error) => self.toast(ToastKind::Error, format!("The update was not installed: {error}")),
+                Event::InstallFailed(error) => {
+                    tracing::warn!("update not installed: {error}");
+                    self.toast(ToastKind::Error, format!("The update was not installed: {error}"));
+                }
             }
         }
     }
