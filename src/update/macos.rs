@@ -359,7 +359,7 @@ mod tools {
     pub fn open_after_exit(app: &Path, env: &[(&str, String)]) -> Result<(), String> {
         use std::os::unix::process::CommandExt;
         const SCRIPT: &str =
-            r#"pid=$1; shift; while /bin/kill -0 "$pid" 2>/dev/null; do /bin/sleep 0.2; done; exec /usr/bin/open -n "$@""#;
+            r#"pid=$1; shift; n=0; while /bin/kill -0 "$pid" 2>/dev/null; do [ $n -ge 3000 ] && exit 0; n=$((n+1)); /bin/sleep 0.2; done; exec /usr/bin/open -n "$@""#;
         let mut cmd = Command::new("/bin/sh");
         cmd.arg("-c").arg(SCRIPT).arg("sh").arg(std::process::id().to_string());
         for (key, value) in env {
