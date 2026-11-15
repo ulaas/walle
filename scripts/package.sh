@@ -3,11 +3,14 @@
 #
 #   scripts/package.sh <version> <windows-x64|linux-x64> [dist folder]
 #
-#   windows  walle-<v>-windows-x64.zip   walle.exe, README, licences
-#            walle-<v>-windows-x64.msi   installer (WiX Toolset v5: `wix` on PATH with WixToolset.UI.wixext)
-#   linux    walle-<v>-linux-x64.tar.gz  walle, launcher entry, icon, README, licences
-#            walle-<v>-linux-x64.deb     package for Debian and Ubuntu (dpkg-deb)
-#            walle-<v>-linux-x64.rpm     package for Fedora and openSUSE (rpmbuild)
+#   windows  walle-windows-x64.zip   walle.exe, README, licences
+#            walle-windows-x64.msi   installer (WiX Toolset v5: `wix` on PATH with WixToolset.UI.wixext)
+#   linux    walle-linux-x64.tar.gz  walle, launcher entry, icon, README, licences
+#            walle-linux-x64.deb     package for Debian and Ubuntu (dpkg-deb)
+#            walle-linux-x64.rpm     package for Fedora and openSUSE (rpmbuild)
+#
+# The names carry no version, and each archive holds one folder named like it:
+# that is how a running walle finds its update (src/update.rs).
 #
 # A package is skipped, with a note, when its tool is not installed; set
 # WALLE_PACKAGE_STRICT=1 (as the release workflow does) to fail instead.
@@ -18,7 +21,7 @@ platform=${2:?windows-x64 or linux-x64}
 root=$(cd "$(dirname "$0")/.." && pwd)
 dist=${3:-$root/dist}
 target=${CARGO_TARGET_DIR:-$root/target}
-name="walle-$version-$platform"
+name="walle-$platform"
 
 need() {
   command -v "$1" > /dev/null && return 0

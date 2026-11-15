@@ -112,6 +112,9 @@ impl App {
         row(ui, "License", &mut |ui| {
             ui.label(build_info::LICENSE);
         });
+        row(ui, "Updates", &mut |ui| {
+            ui.vertical(|ui| self.about_update(ui));
+        });
 
         ui.add_space(6.0);
         ui.separator();
@@ -159,6 +162,77 @@ impl App {
                     }
                 });
             });
+    }
+
+    /// The update check, the update on offer and its progress.
+    fn about_update(&mut self, ui: &mut egui::Ui) {
+        use crate::update::{Phase, Stage};
+        let p = self.pal;
+        let phase = self.updater.phase().clone();
+        let version = self.updater.version().map(str::to_string);
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+        match (&phase, version) {
+            (Phase::Checking, _) => {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(RichText::new("Checking…").color(p.weak));
+                });
+            }
+            (Phase::Installing, _) => {
+                let (stage, (done, total)) = self.updater.progress().map_or((Stage::Checking, (0, 0)), |pr| (pr.stage(), pr.bytes()));
+                let what = match stage {
+                    Stage::Checking => "Looking up the release…".to_string(),
+                    Stage::Downloading if total > 0 => {
+                        format!("Downloading: {} of {}", theme::human_size(done), theme::human_size(total))
+                    }
+                    Stage::Downloading => "Downloading…".to_string(),
+                    Stage::Verifying => "Checking the download…".to_string(),
+                    Stage::Installing => "Installing…".to_string(),
+                };
+                ui.label(what);
+                let fraction = if total > 0 { done as f32 / total as f32 } else { 0.0 };
+                ui.add(egui::ProgressBar::new(fraction).desired_width(220.0).desired_height(6.0));
+                if ui.button("Cancel").clicked() {
+                    self.updater.cancel();
+                }
+            }
+            (Phase::Ready, _) => {
+                ui.label("Restarting…");
+            }
+            (Phase::Available | Phase::Failed(_), Some(version)) => {
+                let kind = self.updater.kind();
+                ui.label(semibold(format!("walle {version} is available")));
+                if let Phase::Failed(error) = &phase {
+                    ui.label(RichText::new(format!("The update was not installed: {error}")).color(p.danger));
+                }
+                ui.label(RichText::new(kind.advice()).size(12.5).color(p.weak));
+                ui.add_space(2.0);
+                ui.horizontal(|ui| {
+                    if let Some(action) = kind.action()
+                        && theme::primary_button(ui, &p, action).clicked()
+                    {
+                        self.install_update();
+                    }
+                    if ui.link("Release page").clicked() {
+                        self.actions.push(Action::OpenUrl(self.updater.page().to_string()));
+                    }
+                });
+            }
+            (phase, _) => {
+                match phase {
+                    Phase::UpToDate => {
+                        ui.label(RichText::new("walle is up to date").color(p.weak));
+                    }
+                    Phase::CheckFailed(error) | Phase::Failed(error) => {
+                        ui.label(RichText::new(format!("Could not check: {error}")).color(p.danger));
+                    }
+                    _ => {}
+                }
+                if ui.button(theme::with_icon(ph::ARROWS_CLOCKWISE, "Check for updates")).clicked() {
+                    self.check_for_updates(true);
+                }
+            }
+        }
     }
 
     fn about_buttons(&mut self, ui: &mut egui::Ui) {

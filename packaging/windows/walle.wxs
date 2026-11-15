@@ -2,10 +2,12 @@
   walle MSI (WiX Toolset v5). Built by scripts/package.sh in the release workflow:
 
     wix build packaging/windows/walle.wxs -arch x64 -ext WixToolset.UI.wixext
-      -d Version=0.6.1 -d BinDir=<folder with walle.exe> -d IconFile=<walle.ico>
-      -o walle-0.6.1-windows-x64.msi
+      -d Version=0.7.0 -d BinDir=<folder with walle.exe> -d IconFile=<walle.ico>
+      -o walle-windows-x64.msi
 
   Installs for all users into Program Files and adds a Start menu shortcut.
+  HKLM\Software\walle is also how walle knows it was installed this way, and
+  so updates itself by running the next MSI (src/update.rs).
   The UpgradeCode must never change: it is how a newer MSI replaces an older one.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">

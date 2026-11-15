@@ -25,15 +25,34 @@ mod tray;
 #[path = "tray_linux.rs"]
 mod tray;
 mod ui;
+mod update;
 mod worker;
 
 fn main() -> anyhow::Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    // Also how an update makes sure the new walle runs here before it replaces the old one.
+    if args.iter().any(|a| a == "--version") {
+        println!("walle {} ({})", build_info::VERSION, build_info::commit_label());
+        return Ok(());
+    }
+    // The helper copy that runs the installer once walle has closed (update.rs).
+    if let [_, flag, msi, exe, sha256] = args.as_slice()
+        && flag == update::FINISH_ARG
+    {
+        update::finish_update(std::path::Path::new(msi), std::path::Path::new(exe), sha256);
+        return Ok(());
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "walle=info".into()),
         )
         .init();
 
+    // Started by an update: the walle it replaces is still closing.
+    if update::restarted() {
+        single_instance::wait_until_free(std::time::Duration::from_secs(15));
+    }
     // A second launch just brings the running instance to the front.
     let on_show = match single_instance::claim() {
         single_instance::Claim::Secondary => {

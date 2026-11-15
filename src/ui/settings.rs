@@ -757,6 +757,9 @@ impl App {
                 ui.checkbox(&mut draft.close_to_tray, "Closing the window keeps walle running in the tray")
                     .on_disabled_hover_text("No panel in this session shows tray icons (walle offers a StatusNotifierItem)");
             });
+            ui.checkbox(&mut draft.check_updates, "Check for a new version once a day").on_hover_text(
+                "Asks GitHub for walle's latest release. The request carries nothing but walle's version, and nothing is downloaded until you click.",
+            );
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.label("Thumbnail cache limit");

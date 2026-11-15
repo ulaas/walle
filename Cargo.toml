@@ -1,6 +1,6 @@
 [package]
 name = "walle"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2024"
 description = "Browse, tag, curate and set wallpapers from online services"
 license = "MIT"
@@ -11,7 +11,7 @@ readme = "README.md"
 [dependencies]
 eframe = { version = "0.37", default-features = false, features = ["clipboard", "default_fonts", "glow", "links", "persistence", "wayland", "x11"] }
 egui = { version = "0.37", features = ["monochrome_emoji_fonts"] }
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs"] }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
@@ -26,6 +26,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 urlencoding = "2"
 rfd = "0.17"
+# The update check: checksums of downloads, and the executable out of a release archive.
+sha2 = "0.10"
+flate2 = "1"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_Controls", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry"] }

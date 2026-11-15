@@ -284,6 +284,9 @@ pub struct App {
     picker_tx: std::sync::mpsc::Sender<Option<pickers::Picked>>,
     picker_rx: std::sync::mpsc::Receiver<Option<pickers::Picked>>,
     picker_busy: bool,
+    /// The update check and the update itself (update.rs).
+    updater: crate::update::Updater,
+    update_seen: crate::update::Seen,
 }
 
 impl App {
@@ -338,6 +341,9 @@ impl App {
         if let Some(window) = native_window {
             crate::native_window::style(window, pal.border, pal.bg, pal.dark);
         }
+
+        let update_seen = crate::update::Seen::load(&paths.update_file());
+        let updater = crate::update::Updater::new(Some(paths.update_dir()), update_seen.version.as_deref());
 
         let mut app = Self {
             infos: vec![],
@@ -431,9 +437,12 @@ impl App {
             picker_tx,
             picker_rx,
             picker_busy: false,
+            updater,
+            update_seen,
             config,
         };
         app.show_about = start.about;
+        app.start_updates();
         app.shown = crate::desktop::Shown::load(&app.paths);
         app.worker.send(Command::Desktop);
         app.refresh_providers();
@@ -1714,6 +1723,81 @@ impl App {
         }
     }
 
+    // ---------- updates ----------
+
+    /// After a restart: say what became of an update, clear away what it left, and
+    /// ask for the latest version if a day has passed.
+    fn start_updates(&mut self) {
+        // Tests neither report on, clean up after, nor ask the network about updates.
+        if cfg!(test) {
+            return;
+        }
+        match crate::update::Updater::restart_note() {
+            Some(Ok(msg)) => self.toast(ToastKind::Success, msg),
+            Some(Err(msg)) => self.toast(ToastKind::Error, msg),
+            None => {}
+        }
+        self.updater.clean_up();
+        let due = crate::update::check_due(self.config.check_updates, self.update_seen.last_check, crate::update::now());
+        // A development build never updates itself, so it has no reason to ask.
+        if due && !cfg!(debug_assertions) {
+            self.check_for_updates(false);
+        }
+    }
+
+    fn update_notify(&self) -> crate::update::Notify {
+        let ctx = self.ctx.clone();
+        std::sync::Arc::new(move || ctx.request_repaint())
+    }
+
+    /// Ask GitHub for the latest release. `manual`: the user asked.
+    pub(super) fn check_for_updates(&mut self, manual: bool) {
+        self.updater.check(manual, self.update_notify());
+    }
+
+    /// Download, verify and install the update on offer. Only ever on a click.
+    pub(super) fn install_update(&mut self) {
+        self.updater.install(self.update_notify());
+    }
+
+    fn poll_updates(&mut self, ctx: &egui::Context) {
+        use crate::update::Event;
+        for event in self.updater.poll() {
+            match event {
+                Event::Checked { found, manual } => {
+                    let news = found.is_some() && found != self.update_seen.version;
+                    self.update_seen = crate::update::Seen { last_check: Some(crate::update::now()), version: found.clone() };
+                    self.update_seen.save(&self.paths.update_file());
+                    // A check the user asked for answers where they asked; one found again is not news.
+                    if let Some(version) = found
+                        && news
+                        && !manual
+                    {
+                        self.toast(ToastKind::Info, format!("walle {version} is available. Press F1 to update."));
+                    }
+                }
+                Event::CheckFailed { error, manual } => {
+                    // Counts as today's check, so a network that is down is not asked again and again.
+                    self.update_seen.last_check = Some(crate::update::now());
+                    self.update_seen.save(&self.paths.update_file());
+                    if !manual {
+                        tracing::info!("update check failed: {error}");
+                    }
+                }
+                Event::Ready => match self.updater.relaunch() {
+                    Ok(()) => {
+                        self.commit_settings_draft();
+                        self.quitting = true;
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                    Err(e) => self.toast(ToastKind::Error, e),
+                },
+                Event::InstallFailed(error) => self.toast(ToastKind::Error, format!("The update was not installed: {error}")),
+            }
+        }
+    }
+
     /// Closing the window hides it to the tray instead of quitting (when enabled).
     fn handle_close(&mut self, ctx: &egui::Context) {
         let close = ctx.input(|i| i.viewport().close_requested());
@@ -1747,6 +1831,7 @@ impl eframe::App for App {
         self.process_events(ctx);
         self.handle_remote(ctx);
         self.handle_picked();
+        self.poll_updates(ctx);
         if self.hide_frames > 0 {
             self.hide_frames -= 1;
             if self.hidden {

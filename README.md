@@ -19,7 +19,7 @@ Most wallpaper tools stop at "search and set". walle is built around the part in
 * **Reject** the rest, and never see them again in any search.
 * **Set** a wallpaper with `Enter`, or let rotation change it for you.
 
-Everything is local: a SQLite library, a cache on disk and one config file. There is no account and no telemetry.
+Everything is local: a SQLite library, a cache on disk and one config file. There is no account and no telemetry; apart from the wallpaper sources you browse, the only thing walle contacts is GitHub, for the [daily version check](#updates) you can switch off.
 
 | Compare | Library |
 |---|---|
@@ -47,15 +47,25 @@ Download the latest build from the [releases page](https://github.com/ulaas/wall
 
 | System | File | How |
 |---|---|---|
-| Windows | `walle-<version>-windows-x64.msi` | Installer: Program Files and a Start menu entry. A newer one replaces the older. |
-| Windows | `walle-<version>-windows-x64.zip` | No installer: unpack it anywhere and run `walle.exe`. |
-| Fedora, openSUSE | `walle-<version>-linux-x64.rpm` | `sudo dnf install ./walle-*.rpm` |
-| Debian, Ubuntu 24.04 or newer | `walle-<version>-linux-x64.deb` | `sudo apt install ./walle-*.deb` |
-| Any Linux | `walle-<version>-linux-x64.tar.gz` | Unpack it and run `./walle`. |
+| Windows | `walle-windows-x64.msi` | Installer: Program Files and a Start menu entry. A newer one replaces the older. |
+| Windows | `walle-windows-x64.zip` | No installer: unpack it anywhere and run `walle.exe`. |
+| Fedora, openSUSE | `walle-linux-x64.rpm` | `sudo dnf install ./walle-linux-x64.rpm` |
+| Debian, Ubuntu 24.04 or newer | `walle-linux-x64.deb` | `sudo apt install ./walle-linux-x64.deb` |
+| Any Linux | `walle-linux-x64.tar.gz` | Unpack it and run `./walle`. |
 
 The Windows files are not code-signed, so SmartScreen may ask before the first start. On Linux walle needs the usual X11 or Wayland, `libxkbcommon` and GL libraries, which a desktop system already has.
 
 Each release comes with `SHA256SUMS.txt` to check the download against.
+
+## Updates
+
+walle asks GitHub once a day, when it starts, whether there is a newer release, and tells you if there is. The request carries nothing but `walle/<version>` as its User-Agent. Turn it off in Settings > *System*; *Check for updates* in the About box (`F1`) asks at once.
+
+Nothing is downloaded until you click **Update and restart** in the About box. walle then fetches the file for your kind of install from this repository's releases over HTTPS, and installs it only if its SHA-256 matches both the release's `SHA256SUMS.txt` and GitHub's own digest of the file.
+
+* **The zip on Windows, the tarball on Linux**: the executable is replaced in place and walle restarts. A new version that does not start on your computer is not put in place.
+* **The MSI**: the new installer is run; Windows asks for permission.
+* **The `.rpm` and `.deb`**: walle only says that there is a new version. Install the new package from the releases page.
 
 ## Build from source
 

@@ -43,6 +43,8 @@ pub struct Config {
     pub cache_limit_mb: u64,
     /// Hide browse results that look like wallpapers already in the library.
     pub hide_duplicates: bool,
+    /// Ask GitHub once a day whether there is a newer walle.
+    pub check_updates: bool,
 }
 
 /// Where automatic wallpaper rotation picks from.
@@ -124,6 +126,7 @@ impl Default for Config {
             close_to_tray: true,
             cache_limit_mb: 500,
             hide_duplicates: false,
+            check_updates: true,
         }
     }
 }
@@ -212,6 +215,14 @@ impl Paths {
     }
     pub fn db_file(&self) -> PathBuf {
         self.data_dir.join("library.db")
+    }
+    /// What walle remembers about updates between runs.
+    pub fn update_file(&self) -> PathBuf {
+        self.data_dir.join("update.json")
+    }
+    /// Where an update is downloaded to.
+    pub fn update_dir(&self) -> PathBuf {
+        self.cache_dir.join("update")
     }
     pub fn thumbs_dir(&self) -> PathBuf {
         self.cache_dir.join("thumbs")

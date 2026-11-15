@@ -30,6 +30,15 @@ pub enum Claim {
     Secondary,
 }
 
+/// Wait until no walle holds the instance port any more, or `max` has passed.
+pub fn wait_until_free(max: Duration) {
+    let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port()));
+    let deadline = std::time::Instant::now() + max;
+    while TcpListener::bind(addr).is_err() && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
 pub fn claim() -> Claim {
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port()));
     match TcpListener::bind(addr) {

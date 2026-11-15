@@ -635,6 +635,31 @@ fn picker_results_are_applied() {
     assert!(!h.state().picker_busy);
 }
 
+/// About carries the update check, and offers a newer version an earlier run found.
+#[test]
+fn about_offers_the_update_check_and_a_newer_version() {
+    let sb = Sandbox::new("about-update", 1);
+    let mut h = harness(&sb);
+    wait_until(&mut h, "results", |a| a.results.len() == 1);
+    assert!(h.state().config.check_updates, "the daily check is on unless turned off");
+    assert_eq!(h.state().updater.phase(), &crate::update::Phase::Idle, "a test never asks the network");
+
+    h.key_press(Key::F1);
+    h.step();
+    h.step();
+    assert!(h.query_by_label_contains("Check for updates").is_some());
+    assert!(h.query_by_label_contains("is available").is_none());
+
+    h.state_mut().updater = crate::update::Updater::new(None, Some("999.0.0"));
+    h.step();
+    h.step();
+    assert!(h.query_by_label_contains("walle 999.0.0 is available").is_some());
+    assert!(h.query_by_label("Release page").is_some());
+    // A debug build says why it does not update itself, and offers no button that would.
+    assert!(h.query_by_label_contains("development build").is_some());
+    assert!(h.query_by_label("Update and restart").is_none());
+}
+
 #[test]
 fn about_box_names_the_build() {
     let sb = Sandbox::new("about", 1);
@@ -1205,7 +1230,13 @@ fn screenshots() {
     section_of_settings(&mut h, Section::Appearance);
     h.state_mut().show_about = true;
     shot(&mut h, "08-about");
+    h.state_mut().updater = crate::update::Updater::new(None, Some("999.0.0"));
+    shot(&mut h, "08b-about-update");
+    h.state_mut().updater = crate::update::Updater::new(None, None);
     h.state_mut().show_about = false;
+    view(&mut h, View::Settings);
+    section_of_settings(&mut h, Section::System);
+    shot(&mut h, "07c-settings-system");
     view(&mut h, View::Browse);
     h.state_mut().actions.push(super::Action::Lightbox(items[4].clone()));
     h.step();
