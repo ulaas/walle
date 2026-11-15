@@ -1,6 +1,6 @@
 [package]
 name = "walle"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2024"
 description = "Browse, tag, curate and set wallpapers from online services"
 license = "MIT"
