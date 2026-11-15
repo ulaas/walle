@@ -2,7 +2,7 @@
 
 **Browse, shortlist, compare, keep and set wallpapers.** A fast, keyboard-driven desktop app for Windows and Linux, written in Rust with [egui](https://github.com/emilk/egui).
 
-[Website](https://ulaas.github.io/walle/) · [Build it](#build-and-run) · [Shortcuts](#shortcuts)
+[Website](https://ulaas.github.io/walle/) · [Download](https://github.com/ulaas/walle/releases/latest) · [Shortcuts](#shortcuts)
 
 ![walle's Browse view: a grid of wallpapers with status badges, and the detail panel of the selected one](docs/assets/browse.png)
 
@@ -41,7 +41,16 @@ Everything is local: a SQLite library, a cache on disk and one config file. Ther
 
 walle is not affiliated with any of these services. The pictures belong to their authors, and each service's terms apply to what you download from it.
 
-## Build and run
+## Install
+
+Download the latest build from the [releases page](https://github.com/ulaas/walle/releases/latest):
+
+* **Windows**: `walle-<version>-windows-x64.zip`. Unpack it anywhere and run `walle.exe`. The build is not code-signed, so SmartScreen may ask before the first start.
+* **Linux**: `walle-<version>-linux-x64.tar.gz`. Unpack it and run `./walle`. It needs the usual X11 or Wayland, `libxkbcommon` and GL libraries, which a desktop system already has.
+
+Each release comes with `SHA256SUMS.txt` to check the download against.
+
+## Build from source
 
 You need a current stable [Rust toolchain](https://rustup.rs).
 
