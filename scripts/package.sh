@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Packs a release build of walle into what a release offers.
 #
-#   scripts/package.sh <version> <windows-x64|linux-x64> [dist folder]
+#   scripts/package.sh <version> <windows-x64|linux-x64|macos-arm64> [dist folder]
 #
 #   windows  walle-windows-x64.zip   walle.exe, README, licences
 #            walle-windows-x64.msi   installer (WiX Toolset v5: `wix` on PATH with WixToolset.UI.wixext)
 #   linux    walle-linux-x64.tar.gz  walle, launcher entry, icon, README, licences
 #            walle-linux-x64.deb     package for Debian and Ubuntu (dpkg-deb)
 #            walle-linux-x64.rpm     package for Fedora and openSUSE (rpmbuild)
+#   macos    walle-macos-arm64.dmg   walle.app to drag to Applications (scripts/package-macos.sh,
+#                                    which builds for aarch64-apple-darwin itself)
 #
 # The names carry no version, and each archive holds one folder named like it:
 # that is how a running walle finds its update (src/update.rs).
@@ -17,11 +19,15 @@
 set -euo pipefail
 
 version=${1:?version, like 0.6.1}
-platform=${2:?windows-x64 or linux-x64}
+platform=${2:?windows-x64, linux-x64 or macos-arm64}
 root=$(cd "$(dirname "$0")/.." && pwd)
 dist=${3:-$root/dist}
 target=${CARGO_TARGET_DIR:-$root/target}
 name="walle-$platform"
+
+if [ "$platform" = macos-arm64 ]; then
+  exec "$root/scripts/package-macos.sh" "$dist"
+fi
 
 need() {
   command -v "$1" > /dev/null && return 0

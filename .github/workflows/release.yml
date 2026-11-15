@@ -1,4 +1,4 @@
-# Builds walle for Windows and Linux when a version tag is pushed, and publishes
+# Builds walle for Windows, Linux and macOS when a version tag is pushed, and publishes
 # them as a GitHub release with their SHA-256 checksums.
 #
 #   1. Set `version` in Cargo.toml, commit, push.
@@ -37,6 +37,9 @@ jobs:
           - name: walle-linux-x64
             os: ubuntu-24.04
             platform: linux-x64
+          - name: walle-macos-arm64
+            os: macos-14
+            platform: macos-arm64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,7 +75,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm
 
-      # Zip and MSI on Windows; tarball, .deb and .rpm on Linux.
+      - name: Install rsvg-convert (app icon)
+        if: runner.os == 'macOS'
+        run: brew install librsvg
+
+      # Zip and MSI on Windows; tarball, .deb and .rpm on Linux; a disk image on macOS.
       - name: Package
         shell: bash
         env:
