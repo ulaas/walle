@@ -12,6 +12,8 @@ use crate::{
 mod gevrek;
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(windows)]
 mod windows;
 
@@ -42,7 +44,15 @@ pub fn displays(custom_cmd: &str) -> Vec<Display> {
         });
     }
     let _ = custom_cmd;
-    vec![]
+    #[cfg(target_os = "macos")]
+    return macos::displays().unwrap_or_else(|e| {
+        tracing::warn!("asking for the screens: {e:#}");
+        vec![]
+    });
+    #[allow(unreachable_code)]
+    {
+        vec![]
+    }
 }
 
 /// Put the pictures on the desktop, all in one change where the desktop allows it.
@@ -56,6 +66,16 @@ pub fn apply(placements: &[Placement], custom_cmd: &str) -> Result<()> {
             .collect::<Result<_>>()?;
         return gevrek::apply(&absolute);
     }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = custom_cmd;
+        let absolute: Vec<Placement> = placements
+            .iter()
+            .map(|p| Ok(Placement { path: std::fs::canonicalize(&p.path)?, ..p.clone() }))
+            .collect::<Result<_>>()?;
+        return macos::apply(&absolute);
+    }
+    #[allow(unreachable_code)]
     for p in placements {
         if let Target::Display(name) = &p.target {
             anyhow::bail!("this desktop takes one wallpaper for all displays (asked for {name})");
@@ -81,6 +101,11 @@ pub fn set_wallpaper(path: &Path, fit: FitMode, custom_cmd: &str) -> Result<()> 
         }
         return linux::set(&path, fit, custom_cmd);
     }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = custom_cmd;
+        return macos::apply(&[Placement { target: Target::All, path, fit }]);
+    }
     #[allow(unreachable_code)]
     {
         let _ = (path, fit, custom_cmd);
@@ -94,6 +119,8 @@ pub fn backend_name() -> String {
     return "Windows (SystemParametersInfo)".into();
     #[cfg(target_os = "linux")]
     return if gevrek::detected() { "gevrek (its own wallpaper, per display)".into() } else { linux::detect().name().into() };
+    #[cfg(target_os = "macos")]
+    return "macOS (NSWorkspace, per display)".into();
     #[allow(unreachable_code)]
     "unsupported".into()
 }
@@ -105,7 +132,9 @@ pub fn current_wallpapers() -> Vec<PathBuf> {
     return windows::current().into_iter().collect();
     #[cfg(target_os = "linux")]
     return if gevrek::detected() { gevrek::current() } else { linux::current().into_iter().collect() };
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    return macos::current();
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     vec![]
 }
 

@@ -39,6 +39,13 @@ raw-window-handle = "0.6"
 # The tray icon: a StatusNotifierItem on the session bus.
 ksni = { version = "0.3", features = ["blocking"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# The wallpaper: NSWorkspace's desktop image of each NSScreen, asked for on the main thread.
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSDictionary", "NSError", "NSGeometry", "NSString", "NSURL", "NSValue"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSCell", "NSScreen", "NSWorkspace"] }
+dispatch2 = "0.3"
+
 [build-dependencies]
 winresource = { version = "0.1", default-features = false }
 
