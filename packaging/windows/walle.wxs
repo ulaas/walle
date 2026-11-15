@@ -1,0 +1,66 @@
+<!--
+  walle MSI (WiX Toolset v5). Built by scripts/package.sh in the release workflow:
+
+    wix build packaging/windows/walle.wxs -arch x64 -ext WixToolset.UI.wixext
+      -d Version=0.6.1 -d BinDir=<folder with walle.exe> -o walle-0.6.1-windows-x64.msi
+
+  Installs for all users into Program Files and adds a Start menu shortcut.
+  The UpgradeCode must never change: it is how a newer MSI replaces an older one.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="walle" Manufacturer="walle" Version="$(Version)" Scope="perMachine"
+           UpgradeCode="c617a8db-4b09-46b8-a9d1-58b517eb82c7" Compressed="yes">
+    <SummaryInformation Description="walle wallpaper browser" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of walle is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- The icon the build embeds in walle.exe, for Apps & features. -->
+    <Icon Id="walle.exe" SourceFile="$(BinDir)\walle.exe" />
+    <Property Id="ARPPRODUCTICON" Value="walle.exe" />
+    <Property Id="ARPURLINFOABOUT" Value="https://ulaas.github.io/walle/" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/ulaas/walle/issues" />
+
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+    <ui:WixUI Id="WixUI_Minimal" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="walle">
+        <Component Id="App">
+          <File Id="WalleExe" Source="$(BinDir)\walle.exe" KeyPath="yes" />
+        </Component>
+        <!-- One file per component: WiX can only generate the component GUID then. -->
+        <Component Id="License">
+          <File Source="$(BinDir)\LICENSE" />
+        </Component>
+        <Component Id="Readme">
+          <File Source="$(BinDir)\README.md" />
+        </Component>
+        <Directory Id="LicensesFolder" Name="licenses">
+          <Component Id="LicenseInter">
+            <File Source="$(BinDir)\licenses\Inter-OFL.txt" />
+          </Component>
+          <Component Id="LicensePhosphor">
+            <File Source="$(BinDir)\licenses\Phosphor-LICENSE.txt" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenu">
+        <Shortcut Id="StartMenuShortcut" Name="walle" Description="Browse, shortlist, compare, keep and set wallpapers"
+                  Target="[#WalleExe]" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM" Key="Software\walle" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Main">
+      <ComponentRef Id="App" />
+      <ComponentRef Id="License" />
+      <ComponentRef Id="Readme" />
+      <ComponentRef Id="LicenseInter" />
+      <ComponentRef Id="LicensePhosphor" />
+      <ComponentRef Id="StartMenu" />
+    </Feature>
+  </Package>
+</Wix>

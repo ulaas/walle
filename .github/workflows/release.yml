@@ -5,9 +5,12 @@
 #   2. git tag -a v<version> -m "walle <version>" && git push origin v<version>
 name: Release
 
+# Run by hand (Actions > Release > Run workflow) it builds and packs everything
+# and keeps the files as workflow artifacts, without publishing a release.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -47,7 +50,7 @@ jobs:
         shell: bash
         run: |
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match version $version in Cargo.toml"
             exit 1
           fi
@@ -59,36 +62,34 @@ jobs:
       - name: Build
         run: cargo build --locked --release
 
+      - name: Install WiX (MSI installer)
+        if: runner.os == 'Windows'
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.UI.wixext/5.0.2
+
+      - name: Install rpmbuild
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm
+
+      # Zip and MSI on Windows; tarball, .deb and .rpm on Linux.
       - name: Package
         shell: bash
-        run: |
-          name="walle-$VERSION-${{ matrix.platform }}"
-          mkdir -p "dist/$name/licenses"
-          cp README.md LICENSE "dist/$name/"
-          cp assets/fonts/OFL.txt "dist/$name/licenses/Inter-OFL.txt"
-          cp assets/fonts/Phosphor-LICENSE.txt "dist/$name/licenses/Phosphor-LICENSE.txt"
-          cd dist
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            cp ../target/release/walle.exe "$name/"
-            7z a -tzip "$name.zip" "$name" > /dev/null
-          else
-            cp ../target/release/walle "$name/"
-            cp ../assets/logo.svg "$name/walle.svg"
-            tar -czf "$name.tar.gz" "$name"
-          fi
-          rm -r "$name"
-          ls -l
+        env:
+          WALLE_PACKAGE_STRICT: "1"
+        run: scripts/package.sh "$VERSION" "${{ matrix.platform }}" dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: dist/*
+          path: dist/walle-*
           if-no-files-found: error
           retention-days: 7
 
   publish:
     name: Publish the release
     needs: build
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

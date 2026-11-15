@@ -1,0 +1,15 @@
+Package: walle
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Aydemir Şahin <ulaas@users.noreply.github.com>
+Installed-Size: @SIZE@
+Depends: libc6 (>= 2.39), libgcc-s1
+Recommends: libxkbcommon0, libxkbcommon-x11-0, libwayland-client0, libwayland-egl1, libx11-6, libxcursor1, libxi6, libxrandr2, libgl1, libegl1
+Section: graphics
+Priority: optional
+Homepage: https://ulaas.github.io/walle/
+Description: Browse, shortlist, compare, keep and set wallpapers
+ walle browses nine wallpaper sources in one window and is built around
+ deciding: a shortlist, side-by-side compare where the winner stays on,
+ an offline library with ratings, tags and notes, rotation and effects.
+ Everything is kept locally; there is no account and no telemetry.

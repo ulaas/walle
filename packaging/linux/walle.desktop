@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=walle
+GenericName=Wallpaper Browser
+Comment=Browse, shortlist, compare, keep and set wallpapers
+Exec=walle
+Icon=walle
+Terminal=false
+Categories=Graphics;Viewer;
+Keywords=wallpaper;background;desktop;
+StartupWMClass=walle

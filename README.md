@@ -45,8 +45,15 @@ walle is not affiliated with any of these services. The pictures belong to their
 
 Download the latest build from the [releases page](https://github.com/ulaas/walle/releases/latest):
 
-* **Windows**: `walle-<version>-windows-x64.zip`. Unpack it anywhere and run `walle.exe`. The build is not code-signed, so SmartScreen may ask before the first start.
-* **Linux**: `walle-<version>-linux-x64.tar.gz`. Unpack it and run `./walle`. It needs the usual X11 or Wayland, `libxkbcommon` and GL libraries, which a desktop system already has.
+| System | File | How |
+|---|---|---|
+| Windows | `walle-<version>-windows-x64.msi` | Installer: Program Files and a Start menu entry. A newer one replaces the older. |
+| Windows | `walle-<version>-windows-x64.zip` | No installer: unpack it anywhere and run `walle.exe`. |
+| Fedora, openSUSE | `walle-<version>-linux-x64.rpm` | `sudo dnf install ./walle-*.rpm` |
+| Debian, Ubuntu 24.04 or newer | `walle-<version>-linux-x64.deb` | `sudo apt install ./walle-*.deb` |
+| Any Linux | `walle-<version>-linux-x64.tar.gz` | Unpack it and run `./walle`. |
+
+The Windows files are not code-signed, so SmartScreen may ask before the first start. On Linux walle needs the usual X11 or Wayland, `libxkbcommon` and GL libraries, which a desktop system already has.
 
 Each release comes with `SHA256SUMS.txt` to check the download against.
 
