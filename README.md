@@ -67,7 +67,11 @@ Nothing is downloaded until you click **Update and restart** in the About box. w
 * **The zip on Windows, the tarball on Linux**: the executable is replaced in place and walle restarts. A new version that does not start on your computer is not put in place.
 * **The MSI**: the new installer is run; Windows asks for permission.
 * **The `.rpm` and `.deb`**: walle only says that there is a new version. Install the new package from the releases page.
-* **macOS**: walle only says that there is a new version. Download the new disk image from the releases page and drag walle to Applications again.
+* **macOS**: walle downloads the new disk image and checks it as above, mounts it read-only and out of sight, and checks the walle.app in it: the same bundle ID, the release's version, a valid signature from the same Developer ID team as the running app, and Gatekeeper's approval (it is notarized). It then copies the new app beside the installed one and swaps the two, so `walle.app` is never half-copied; if anything fails, the old version stays and keeps running. Once walle has quit, the new version opens. walle only says how to update, and replaces nothing, when:
+  * it was installed with Homebrew: run `brew upgrade --cask walle`;
+  * it runs where it was downloaded (macOS then runs a temporary copy) or from its disk image: move it to Applications and open it from there;
+  * it cannot write to the folder it is in, for example `/Applications` on an account that is not an administrator: walle does not ask for an administrator's password; get the new disk image from the releases page;
+  * it is signed ad hoc (built with `scripts/package-macos.sh` without a Developer ID): get the new disk image from the releases page and drag walle to Applications again.
 
 ## Build from source
 
@@ -81,7 +85,7 @@ cargo run --release
 
 On Linux you need the usual egui system libraries (X11/Wayland, `libxkbcommon`, GL). On macOS you need Xcode's command line tools (`xcode-select --install`).
 
-To pack walle the way a release does, run `scripts/package.sh <version> <platform>`. On a Mac, `scripts/package-macos.sh` builds for Apple Silicon (`aarch64-apple-darwin`), assembles `walle.app` with its icon, signs it ad hoc and writes `dist/walle-macos-arm64.dmg`. It needs `rsvg-convert` for the icon (`brew install librsvg`). Set `MACOS_SIGN_IDENTITY` to a Developer ID Application identity to sign with it instead, and `MACOS_NOTARY_PROFILE` to a `notarytool` keychain profile to notarize the disk image as well. The release workflow does both when the repository has the `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `MACOS_CODESIGN_IDENTITY` and `MACOS_NOTARY_KEY_P8` / `_KEY_ID` / `_ISSUER` (App Store Connect API key) secrets; without them it signs ad hoc.
+To pack walle the way a release does, run `scripts/package.sh <version> <platform>`. On a Mac, `scripts/package-macos.sh` builds for Apple Silicon (`aarch64-apple-darwin`), assembles `walle.app` with its icon, signs it ad hoc and writes `dist/walle-macos-arm64.dmg`. It needs `rsvg-convert` for the icon (`brew install librsvg`). Set `MACOS_SIGN_IDENTITY` to a Developer ID Application identity to sign with it instead, and `MACOS_NOTARY_PROFILE` to a `notarytool` keychain profile to notarize the disk image as well. A copy signed ad hoc does not update itself; one signed with a Developer ID updates only to apps signed by the same team. The release workflow does both when the repository has the `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `MACOS_CODESIGN_IDENTITY` and `MACOS_NOTARY_KEY_P8` / `_KEY_ID` / `_ISSUER` (App Store Connect API key) secrets; without them it signs ad hoc.
 
 ## API keys
 

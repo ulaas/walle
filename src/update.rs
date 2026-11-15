@@ -9,7 +9,10 @@
 //!
 //! How the update is put in place depends on how walle was installed (see
 //! [`InstallKind`]). Copies that belong to a package manager are never
-//! touched: they only say how to update.
+//! touched: they only say how to update. The macOS app replaces its whole
+//! bundle from the release's disk image (see `update/macos.rs`).
+
+mod macos;
 
 use crate::build_info;
 use serde::{Deserialize, Serialize};
@@ -123,6 +126,23 @@ pub struct Source {
 }
 
 impl Source {
+    /// GitHub. Only a build with the `test-feed` feature, which no release has,
+    /// can be pointed at a local stand-in with `WALLE_UPDATE_FEED=http://127.0.0.1:<port>/`
+    /// instead, for trying the whole update on a computer.
+    pub fn configured() -> Self {
+        #[cfg(feature = "test-feed")]
+        if let Some(base) = std::env::var("WALLE_UPDATE_FEED").ok().filter(|b| b.ends_with('/')) {
+            tracing::warn!("update: asking {base} instead of GitHub (test-feed build)");
+            return Self {
+                api: format!("{base}repos/ulaas/walle/releases/latest"),
+                downloads: format!("{base}ulaas/walle/releases/download/"),
+                pages: format!("{base}ulaas/walle/"),
+                https_only: false,
+            };
+        }
+        Self::github()
+    }
+
     pub fn github() -> Self {
         Self {
             api: "https://api.github.com/repos/ulaas/walle/releases/latest".into(),
@@ -533,8 +553,15 @@ pub enum Managed {
     DevBuild,
     /// No release file fits this system or this layout.
     Unsupported,
-    /// The macOS app, from a disk image: the new one is dragged to Applications by hand.
+    /// The macOS app, signed ad hoc or not at all, so a new one cannot be checked
+    /// against it: the new disk image is dragged to Applications by hand.
     MacApp,
+    /// The macOS app, installed by Homebrew: `brew upgrade --cask walle`.
+    Homebrew,
+    /// The macOS app, run where it was downloaded, from App Translocation's read-only copy.
+    Translocated,
+    /// The macOS app, run from its mounted disk image.
+    DiskImage,
 }
 
 /// How this copy of walle got onto the computer, which decides how it is updated.
@@ -546,6 +573,9 @@ pub enum InstallKind {
     WindowsMsi,
     /// ~/.local/bin/walle or an unpacked tarball in a writable folder: replaced in place.
     LinuxBinary,
+    /// walle.app, signed with a Developer ID, in a folder the user can write to:
+    /// the bundle is replaced from the release's disk image.
+    MacBundle,
     /// Updated by something else; walle only says how.
     Managed(Managed),
 }
@@ -564,6 +594,50 @@ pub struct Facts {
     pub release_build: bool,
     /// Releases carry a build for this processor.
     pub arch_ok: bool,
+    pub mac: MacFacts,
+}
+
+/// What decides whether the macOS app can replace its own bundle.
+#[derive(Clone, Debug, Default)]
+pub struct MacFacts {
+    /// The walle.app the executable is in, links resolved; `None` outside a bundle.
+    pub bundle: Option<PathBuf>,
+    /// The bundle is Homebrew's: in a Caskroom, linked from one, or the cask is installed.
+    pub homebrew: bool,
+    /// Run from App Translocation's copy.
+    pub translocated: bool,
+    /// The bundle is on a read-only volume, like its mounted disk image.
+    pub read_only_volume: bool,
+    /// walle can create files beside the bundle.
+    pub parent_writable: bool,
+    /// The Developer ID team the running app is signed by; `None` for ad hoc or unsigned.
+    pub team: Option<String>,
+}
+
+impl MacFacts {
+    #[cfg(target_os = "macos")]
+    fn detect(exe: &Path) -> Self {
+        let Some(as_started) = macos::bundle_of(exe) else { return Self::default() };
+        let bundle = std::fs::canonicalize(&as_started).unwrap_or_else(|_| as_started.clone());
+        let cask = ["/opt/homebrew/Caskroom/walle", "/usr/local/Caskroom/walle"].iter().any(|c| Path::new(c).exists());
+        let homebrew = macos::in_caskroom(&as_started) || macos::in_caskroom(&bundle) || cask;
+        let probe = bundle.parent().map(|dir| {
+            let file = dir.join(format!(".walle-update-{}.tmp", std::process::id()));
+            let made = std::fs::File::create(&file);
+            let _ = std::fs::remove_file(&file);
+            made
+        });
+        let read_only_volume =
+            matches!(&probe, Some(Err(e)) if e.kind() == std::io::ErrorKind::ReadOnlyFilesystem);
+        Self {
+            homebrew,
+            translocated: macos::translocated(&as_started) || macos::translocated(&bundle),
+            read_only_volume,
+            parent_writable: matches!(probe, Some(Ok(_))),
+            team: macos::team_of(&bundle),
+            bundle: Some(bundle),
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -606,8 +680,9 @@ impl Facts {
         } else {
             Os::Linux
         };
-        // Releases are built for Windows and Linux on x64.
-        let arch_ok = cfg!(target_arch = "x86_64") && cfg!(any(windows, target_os = "linux"));
+        // Releases are built for Windows and Linux on x64, and for Apple Silicon.
+        let arch_ok = (cfg!(target_arch = "x86_64") && cfg!(any(windows, target_os = "linux")))
+            || (cfg!(target_arch = "aarch64") && cfg!(target_os = "macos"));
         Self {
             os,
             exe: exe.to_path_buf(),
@@ -619,6 +694,10 @@ impl Facts {
                 .collect(),
             release_build: !cfg!(debug_assertions),
             arch_ok,
+            #[cfg(target_os = "macos")]
+            mac: MacFacts::detect(exe),
+            #[cfg(not(target_os = "macos"))]
+            mac: MacFacts::default(),
         }
     }
 }
@@ -641,7 +720,7 @@ pub fn classify(f: &Facts) -> InstallKind {
     }
     // Never a zip, tarball or MSI on a Mac: the app comes from a disk image.
     if f.os == Os::Mac {
-        return M(Managed::MacApp);
+        return classify_mac(f);
     }
     if !f.arch_ok {
         return M(Managed::Unsupported);
@@ -654,7 +733,7 @@ pub fn classify(f: &Facts) -> InstallKind {
             }
             own_folder.unwrap_or(InstallKind::WindowsPortable)
         }
-        Os::Mac => M(Managed::MacApp),
+        Os::Mac => classify_mac(f),
         Os::Linux => {
             let first = seg.first().map(String::as_str).unwrap_or_default();
             let local = seg.get(1).is_some_and(|s| s == "local");
@@ -666,6 +745,27 @@ pub fn classify(f: &Facts) -> InstallKind {
     }
 }
 
+/// The macOS app replaces itself only where that is safe; anywhere else it says why not.
+fn classify_mac(f: &Facts) -> InstallKind {
+    use InstallKind::Managed as M;
+    let m = &f.mac;
+    if m.bundle.is_none() || !f.arch_ok {
+        M(Managed::Unsupported)
+    } else if m.homebrew {
+        M(Managed::Homebrew)
+    } else if m.translocated {
+        M(Managed::Translocated)
+    } else if m.read_only_volume {
+        M(Managed::DiskImage)
+    } else if !m.parent_writable {
+        M(Managed::ReadOnly)
+    } else if m.team.is_none() {
+        M(Managed::MacApp)
+    } else {
+        InstallKind::MacBundle
+    }
+}
+
 impl InstallKind {
     /// The release file that updates this kind of install; none for copies something else updates.
     pub fn asset(self) -> Option<&'static str> {
@@ -673,6 +773,7 @@ impl InstallKind {
             InstallKind::WindowsPortable => Some("walle-windows-x64.zip"),
             InstallKind::WindowsMsi => Some("walle-windows-x64.msi"),
             InstallKind::LinuxBinary => Some("walle-linux-x64.tar.gz"),
+            InstallKind::MacBundle => Some("walle-macos-arm64.dmg"),
             InstallKind::Managed(_) => None,
         }
     }
@@ -680,9 +781,10 @@ impl InstallKind {
     /// Label of the one-click action, where there is one.
     pub fn action(self) -> Option<&'static str> {
         match self {
-            InstallKind::WindowsPortable | InstallKind::WindowsMsi | InstallKind::LinuxBinary => {
-                Some("Update and restart")
-            }
+            InstallKind::WindowsPortable
+            | InstallKind::WindowsMsi
+            | InstallKind::LinuxBinary
+            | InstallKind::MacBundle => Some("Update and restart"),
             InstallKind::Managed(_) => None,
         }
     }
@@ -695,6 +797,9 @@ impl InstallKind {
             }
             InstallKind::WindowsMsi => {
                 "Downloads the new installer, checks it and runs it. Windows asks for permission."
+            }
+            InstallKind::MacBundle => {
+                "Downloads the new disk image, checks its signature, replaces this walle.app and restarts walle."
             }
             InstallKind::Managed(Managed::SystemPackage) => {
                 "walle was installed as a system package. Get the new package from the release page."
@@ -709,7 +814,19 @@ impl InstallKind {
                 "This copy of walle cannot update itself. Get the new version from the release page."
             }
             InstallKind::Managed(Managed::MacApp) => {
-                "Get the new disk image from the release page and drag walle to Applications, replacing this one."
+                "This walle.app is not signed with a Developer ID, so it does not replace itself. Get the new disk \
+                 image from the release page and drag walle to Applications, replacing this one."
+            }
+            InstallKind::Managed(Managed::Homebrew) => {
+                "walle was installed with Homebrew. Update it with: brew upgrade --cask walle"
+            }
+            InstallKind::Managed(Managed::Translocated) => {
+                "macOS runs this walle from a temporary copy, because it was opened where it was downloaded. \
+                 Move walle to Applications and open it from there; then it can update itself."
+            }
+            InstallKind::Managed(Managed::DiskImage) => {
+                "walle is running from its disk image. Drag it to Applications and open it from there; then it can \
+                 update itself."
             }
         }
     }
@@ -866,6 +983,8 @@ pub enum Staged {
     Swapped(Swap),
     /// A verified installer and its SHA-256, to run once walle has closed.
     Installer(PathBuf, String),
+    /// The new walle.app is in place of the old one; opening it once walle has quit finishes the update.
+    Bundle(PathBuf),
 }
 
 /// Download, verify and stage the update for `plan`. `known` is the release a
@@ -933,6 +1052,10 @@ fn stage(plan: &Plan, file: &Path, bytes: Vec<u8>, version: &str, progress: &Pro
         InstallKind::WindowsPortable => true,
         InstallKind::LinuxBinary => false,
         InstallKind::WindowsMsi => return Ok(Staged::Installer(file.to_path_buf(), hex(&Sha256::digest(&bytes)))),
+        InstallKind::MacBundle => {
+            drop(bytes);
+            return stage_bundle(plan, file, version, progress);
+        }
         InstallKind::Managed(_) => return Err(plan.kind.advice().into()),
     };
     // Both archives hold one folder named like the archive, with the executable in it.
@@ -950,6 +1073,38 @@ fn stage(plan: &Plan, file: &Path, bytes: Vec<u8>, version: &str, progress: &Pro
         return Err(e);
     }
     swap_in(&plan.exe, &new, windows).map(Staged::Swapped)
+}
+
+/// Replace the running walle.app with the one in the verified disk image at `dmg`.
+#[cfg(target_os = "macos")]
+fn stage_bundle(plan: &Plan, dmg: &Path, version: &str, progress: &Progress) -> Result<Staged, String> {
+    let app = macos::bundle_of(&plan.exe).ok_or("walle is not running from walle.app")?;
+    let app = std::fs::canonicalize(&app).map_err(|e| format!("cannot find {}: {e}", app.display()))?;
+    macos::install(&app, dmg, &plan.work, version, progress)?;
+    Ok(Staged::Bundle(app))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn stage_bundle(plan: &Plan, _: &Path, _: &str, _: &Progress) -> Result<Staged, String> {
+    Err(plan.kind.advice().into())
+}
+
+/// Open the new walle.app once this walle has exited, so that only one runs. An
+/// isolated walle (`WALLE_HOME`) comes back isolated.
+#[cfg(target_os = "macos")]
+fn open_bundle(app: &Path) -> Result<(), String> {
+    let mut env = vec![(RESULT_ENV, format!("ok:{}", build_info::VERSION))];
+    if let Some(home) = crate::config::Paths::isolated_home() {
+        env.push(("WALLE_HOME", home.to_string_lossy().into_owned()));
+    }
+    macos::open_after_exit(app, &env).map_err(|e| {
+        format!("The new version is installed, but {e}. Quit walle and open it again to finish the update.")
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn open_bundle(_: &Path) -> Result<(), String> {
+    Err("There is no update to restart into.".into())
 }
 
 /// Start the new executable; if it does not start, put the previous one back.
@@ -1071,6 +1226,10 @@ fn clean_up(exe: Option<PathBuf>, work: Option<PathBuf>) {
         let _ = std::fs::remove_dir_all(dir);
     }
     let Some(exe) = exe else { return };
+    if let Some(app) = macos::bundle_of(&exe) {
+        macos::clean_up(&std::fs::canonicalize(&app).unwrap_or(app));
+        return;
+    }
     let _ = std::fs::remove_file(new_path(&exe));
     let old = old_path(&exe);
     for _ in 0..20 {
@@ -1154,7 +1313,7 @@ impl Updater {
     pub fn new(work: Option<PathBuf>, seen: Option<&str>) -> Self {
         let found = seen.filter(|v| is_newer(v, build_info::VERSION)).map(|v| (v.to_string(), None));
         Self {
-            source: Source::github(),
+            source: Source::configured(),
             exe: std::env::current_exe().ok(),
             work,
             kind: None,
@@ -1324,6 +1483,7 @@ impl Updater {
         let result = match (&self.staged, &self.exe) {
             (Some(Staged::Swapped(swap)), _) => start_new(swap),
             (Some(Staged::Installer(msi, sha256)), Some(exe)) => start_installer(msi, sha256, exe),
+            (Some(Staged::Bundle(app)), _) => open_bundle(app),
             _ => Err("There is no update to restart into.".into()),
         };
         if let Err(e) = &result {
@@ -1526,7 +1686,20 @@ mod tests {
             program_files: vec![PathBuf::from(r"C:\Program Files"), PathBuf::from(r"C:\Program Files (x86)")],
             release_build: true,
             arch_ok: true,
+            mac: MacFacts::default(),
         }
+    }
+
+    /// walle.app at `bundle`, signed by a Developer ID, in a folder the user can write to.
+    fn mac_facts(bundle: &str) -> Facts {
+        let mut f = facts(Os::Mac, &format!("{bundle}/Contents/MacOS/walle"));
+        f.mac = MacFacts {
+            bundle: Some(PathBuf::from(bundle)),
+            parent_writable: true,
+            team: Some("N6FA79GV97".into()),
+            ..MacFacts::default()
+        };
+        f
     }
 
     // ---------------------------------------------------------------- tests
@@ -1652,12 +1825,33 @@ mod tests {
             assert_eq!(kind(Os::Linux, packaged, &read_only), Managed(super::Managed::SystemPackage));
         }
 
-        // macOS: never a Windows or Linux file, whatever the processor.
-        for exe in ["/Applications/walle.app/Contents/MacOS/walle", "/Users/ada/Downloads/walle.app/Contents/MacOS/walle"] {
-            assert_eq!(kind(Os::Mac, exe, &same), Managed(super::Managed::MacApp), "{exe}");
-            assert_eq!(kind(Os::Mac, exe, &read_only), Managed(super::Managed::MacApp), "{exe}");
-            assert_eq!(InstallKind::Managed(super::Managed::MacApp).asset(), None);
+        // macOS: the bundle replaces itself only where that is safe.
+        let mac = |bundle: &str, change: &dyn Fn(&mut MacFacts)| {
+            let mut f = mac_facts(bundle);
+            change(&mut f.mac);
+            classify(&f)
+        };
+        for bundle in ["/Applications/walle.app", "/Users/ada/Applications/walle.app", "/Users/ada/Tools/walle.app"] {
+            assert_eq!(mac(bundle, &|_| {}), MacBundle, "{bundle}");
         }
+        use super::Managed as M;
+        let app = "/Applications/walle.app";
+        assert_eq!(mac(app, &|m| m.homebrew = true), Managed(M::Homebrew));
+        assert_eq!(mac(app, &|m| m.translocated = true), Managed(M::Translocated));
+        assert_eq!(mac(app, &|m| (m.read_only_volume, m.parent_writable) = (true, false)), Managed(M::DiskImage));
+        assert_eq!(mac(app, &|m| m.parent_writable = false), Managed(M::ReadOnly), "an admin's /Applications");
+        assert_eq!(mac(app, &|m| m.team = None), Managed(M::MacApp), "ad hoc or unsigned");
+        assert_eq!(mac(app, &|m| m.bundle = None), Managed(M::Unsupported), "a bare executable");
+        // Homebrew's copy stays Homebrew's, even where everything else would allow the swap.
+        assert_eq!(mac(app, &|m| (m.homebrew, m.team) = (true, Some("N6FA79GV97".into()))), Managed(M::Homebrew));
+        let mut f = mac_facts(app);
+        f.arch_ok = false;
+        assert_eq!(classify(&f), Managed(M::Unsupported));
+        f = mac_facts(app);
+        f.release_build = false;
+        assert_eq!(classify(&f), Managed(M::DevBuild));
+        // Never a Windows or Linux file, whatever the facts.
+        assert_eq!(kind(Os::Mac, "/Applications/walle.app/Contents/MacOS/walle", &same), Managed(M::Unsupported));
 
         // Everywhere
         for (os, exe) in [(Os::Windows, r"D:\src\walle\target\debug\walle.exe"), (Os::Linux, "/home/ada/.local/bin/walle")]
@@ -1673,11 +1867,13 @@ mod tests {
         assert_eq!(WindowsPortable.asset(), Some("walle-windows-x64.zip"));
         assert_eq!(WindowsMsi.asset(), Some("walle-windows-x64.msi"));
         assert_eq!(LinuxBinary.asset(), Some("walle-linux-x64.tar.gz"));
-        for kind in [WindowsPortable, WindowsMsi, LinuxBinary] {
+        assert_eq!(MacBundle.asset(), Some("walle-macos-arm64.dmg"));
+        for kind in [WindowsPortable, WindowsMsi, LinuxBinary, MacBundle] {
             assert_eq!(kind.action(), Some("Update and restart"));
         }
         use super::Managed as M;
-        for m in [M::SystemPackage, M::ReadOnly, M::DevBuild, M::Unsupported] {
+        for m in [M::SystemPackage, M::ReadOnly, M::DevBuild, M::Unsupported, M::MacApp, M::Homebrew, M::Translocated, M::DiskImage]
+        {
             assert_eq!((Managed(m).asset(), Managed(m).action()), (None, None), "{m:?}");
             assert!(!Managed(m).advice().is_empty());
         }
@@ -2006,7 +2202,8 @@ mod tests {
         let archive = zip(&[("walle-windows-x64/walle.exe", b"new walle")]);
         mock.publish("walle-windows-x64.zip", &archive, Some(&sha(&archive)), Some(sha(&archive)));
         let dir = temp("managed");
-        for m in [M::SystemPackage, M::ReadOnly, M::DevBuild, M::Unsupported] {
+        for m in [M::SystemPackage, M::ReadOnly, M::DevBuild, M::Unsupported, M::MacApp, M::Homebrew, M::Translocated, M::DiskImage]
+        {
             let plan = plan(&dir, InstallKind::Managed(m));
             let err = run(&mock, &plan).unwrap_err();
             assert_eq!(err, InstallKind::Managed(m).advice());

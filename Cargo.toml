@@ -30,6 +30,11 @@ rfd = "0.17"
 sha2 = "0.10"
 flate2 = "1"
 
+[features]
+# Lets WALLE_UPDATE_FEED point the updater at a local stand-in for GitHub, to try the whole
+# update on a computer (src/update.rs). Never enabled in a release.
+test-feed = []
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_Controls", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry"] }
 tray-icon = "0.26"

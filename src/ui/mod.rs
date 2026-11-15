@@ -1777,6 +1777,11 @@ impl App {
                     self.update_seen = crate::update::Seen { last_check: Some(crate::update::now()), version: found.clone() };
                     self.update_seen.save(&self.paths.update_file());
                     // A check the user asked for answers where they asked; one found again is not news.
+                    // A test-feed build (never a release) can be told to click "Update and restart" itself.
+                    #[cfg(feature = "test-feed")]
+                    if found.is_some() && std::env::var_os("WALLE_UPDATE_TEST_INSTALL").is_some() {
+                        self.install_update();
+                    }
                     if let Some(version) = found
                         && news
                         && !manual
