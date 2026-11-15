@@ -48,8 +48,15 @@ case "$platform" in
     (cd "$work" && 7z a -tzip "$dist/$name.zip" "$name" > /dev/null)
     if need wix "MSI installer"; then
       # The .wixpdb lands next to the MSI, so build it in the work folder and move the MSI out.
+      # build.rs writes the icon into its output folder; take the newest if there are several.
+      icon=$(find "$target/release/build" -name walle.ico -printf '%T@ %p\n' | sort -rn | head -n 1 | cut -d' ' -f2-)
+      if [ -z "$icon" ]; then
+        echo "error: no walle.ico under $target/release/build (build walle for Windows first)" >&2
+        exit 1
+      fi
       (cd "$root/packaging/windows" && wix build walle.wxs -arch x64 -ext WixToolset.UI.wixext \
-        -d "Version=${version%%-*}" -d "BinDir=$(cygpath -w "$stage")" -o "$(cygpath -w "$work/$name.msi")")
+        -d "Version=${version%%-*}" -d "BinDir=$(cygpath -w "$stage")" -d "IconFile=$(cygpath -w "$icon")" \
+        -o "$(cygpath -w "$work/$name.msi")")
       mv "$work/$name.msi" "$dist/$name.msi"
     fi
     ;;

@@ -2,7 +2,8 @@
   walle MSI (WiX Toolset v5). Built by scripts/package.sh in the release workflow:
 
     wix build packaging/windows/walle.wxs -arch x64 -ext WixToolset.UI.wixext
-      -d Version=0.6.1 -d BinDir=<folder with walle.exe> -o walle-0.6.1-windows-x64.msi
+      -d Version=0.6.1 -d BinDir=<folder with walle.exe> -d IconFile=<walle.ico>
+      -o walle-0.6.1-windows-x64.msi
 
   Installs for all users into Program Files and adds a Start menu shortcut.
   The UpgradeCode must never change: it is how a newer MSI replaces an older one.
@@ -14,9 +15,9 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of walle is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
-    <!-- The icon the build embeds in walle.exe, for Apps & features. -->
-    <Icon Id="walle.exe" SourceFile="$(BinDir)\walle.exe" />
-    <Property Id="ARPPRODUCTICON" Value="walle.exe" />
+    <!-- For Apps & features: the .ico the build draws and embeds in walle.exe. -->
+    <Icon Id="walle.ico" SourceFile="$(IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="walle.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://ulaas.github.io/walle/" />
     <Property Id="ARPHELPLINK" Value="https://github.com/ulaas/walle/issues" />
 
