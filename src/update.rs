@@ -519,6 +519,7 @@ fn untar_one(tar_gz: &[u8], want: &str) -> Result<Vec<u8>, String> {
 pub enum Os {
     Windows,
     Linux,
+    Mac,
 }
 
 /// Why a copy of walle does not update itself.
@@ -532,6 +533,8 @@ pub enum Managed {
     DevBuild,
     /// No release file fits this system or this layout.
     Unsupported,
+    /// The macOS app, from a disk image: the new one is dragged to Applications by hand.
+    MacApp,
 }
 
 /// How this copy of walle got onto the computer, which decides how it is updated.
@@ -596,7 +599,13 @@ fn dir_writable(dir: &Path) -> bool {
 
 impl Facts {
     pub fn detect(exe: &Path) -> Self {
-        let os = if cfg!(windows) { Os::Windows } else { Os::Linux };
+        let os = if cfg!(windows) {
+            Os::Windows
+        } else if cfg!(target_os = "macos") {
+            Os::Mac
+        } else {
+            Os::Linux
+        };
         // Releases are built for Windows and Linux on x64.
         let arch_ok = cfg!(target_arch = "x86_64") && cfg!(any(windows, target_os = "linux"));
         Self {
@@ -630,6 +639,10 @@ pub fn classify(f: &Facts) -> InstallKind {
     if !f.release_build {
         return M(Managed::DevBuild);
     }
+    // Never a zip, tarball or MSI on a Mac: the app comes from a disk image.
+    if f.os == Os::Mac {
+        return M(Managed::MacApp);
+    }
     if !f.arch_ok {
         return M(Managed::Unsupported);
     }
@@ -641,6 +654,7 @@ pub fn classify(f: &Facts) -> InstallKind {
             }
             own_folder.unwrap_or(InstallKind::WindowsPortable)
         }
+        Os::Mac => M(Managed::MacApp),
         Os::Linux => {
             let first = seg.first().map(String::as_str).unwrap_or_default();
             let local = seg.get(1).is_some_and(|s| s == "local");
@@ -693,6 +707,9 @@ impl InstallKind {
             }
             InstallKind::Managed(Managed::Unsupported) => {
                 "This copy of walle cannot update itself. Get the new version from the release page."
+            }
+            InstallKind::Managed(Managed::MacApp) => {
+                "Get the new disk image from the release page and drag walle to Applications, replacing this one."
             }
         }
     }
@@ -1633,6 +1650,13 @@ mod tests {
             // Even root, who could write there, leaves a package's files to the package manager.
             assert_eq!(kind(Os::Linux, packaged, &same), Managed(super::Managed::SystemPackage), "{packaged}");
             assert_eq!(kind(Os::Linux, packaged, &read_only), Managed(super::Managed::SystemPackage));
+        }
+
+        // macOS: never a Windows or Linux file, whatever the processor.
+        for exe in ["/Applications/walle.app/Contents/MacOS/walle", "/Users/ada/Downloads/walle.app/Contents/MacOS/walle"] {
+            assert_eq!(kind(Os::Mac, exe, &same), Managed(super::Managed::MacApp), "{exe}");
+            assert_eq!(kind(Os::Mac, exe, &read_only), Managed(super::Managed::MacApp), "{exe}");
+            assert_eq!(InstallKind::Managed(super::Managed::MacApp).asset(), None);
         }
 
         // Everywhere
