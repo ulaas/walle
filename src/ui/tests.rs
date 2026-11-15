@@ -656,8 +656,11 @@ fn about_offers_the_update_check_and_a_newer_version() {
     assert!(h.query_by_label_contains("walle 999.0.0 is available").is_some());
     assert!(h.query_by_label("Release page").is_some());
     // A debug build says why it does not update itself, and offers no button that would.
-    assert!(h.query_by_label_contains("development build").is_some());
-    assert!(h.query_by_label("Update and restart").is_none());
+    // (How a release build is installed depends on where the test runs.)
+    if cfg!(debug_assertions) {
+        assert!(h.query_by_label_contains("development build").is_some());
+        assert!(h.query_by_label("Update and restart").is_none());
+    }
 }
 
 #[test]
