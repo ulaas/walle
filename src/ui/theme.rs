@@ -411,7 +411,9 @@ impl Toasts {
 pub fn open_path(path: &std::path::Path) {
     #[cfg(windows)]
     let r = std::process::Command::new("explorer").arg(path).spawn();
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    let r = std::process::Command::new("/usr/bin/open").arg(path).spawn();
+    #[cfg(not(any(windows, target_os = "macos")))]
     let r = std::process::Command::new("xdg-open").arg(path).spawn();
     if let Err(e) = r {
         tracing::warn!("open {}: {e}", path.display());
@@ -427,7 +429,11 @@ pub fn reveal_path(path: &std::path::Path) {
         use std::os::windows::process::CommandExt;
         let _ = std::process::Command::new("explorer").raw_arg(format!("/select,\"{}\"", path.display())).spawn();
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    if let Err(e) = std::process::Command::new("/usr/bin/open").arg("-R").arg(path).spawn() {
+        tracing::warn!("reveal {}: {e}", path.display());
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         if let Some(dir) = path.parent() {
             open_path(dir);
