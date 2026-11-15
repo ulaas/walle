@@ -142,7 +142,7 @@ impl App {
                     *draft = self.config.clone();
                 }
                 let save = ui.add_enabled_ui(changed, |ui| theme::primary_button(ui, p, with_icon(ph::FLOPPY_DISK, "Save changes"))).inner;
-                let save = save.on_hover_text("Applies at once, no restart needed (Ctrl+S)");
+                let save = save.on_hover_text(theme::shortcut("Applies at once, no restart needed (Ctrl+S)"));
                 if changed && (save.clicked() || shortcut) {
                     self.save_settings(draft.clone());
                 }

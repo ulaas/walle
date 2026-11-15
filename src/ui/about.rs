@@ -145,7 +145,7 @@ impl App {
             .show(ui, |ui| {
                 egui::Grid::new("about-shortcuts-grid").num_columns(2).spacing([16.0, 5.0]).show(ui, |ui| {
                     for (keys, what) in SHORTCUTS {
-                        ui.label(RichText::new(*keys).size(12.5));
+                        ui.label(RichText::new(theme::shortcut(keys)).size(12.5));
                         ui.label(RichText::new(*what).size(12.5).color(p.weak));
                         ui.end_row();
                     }

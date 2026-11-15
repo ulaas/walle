@@ -407,6 +407,11 @@ impl Toasts {
     }
 }
 
+/// A shortcut as this system writes it: egui's command key is Cmd on a Mac.
+pub fn shortcut(text: &str) -> String {
+    if cfg!(target_os = "macos") { text.replace("Ctrl+", "Cmd+") } else { text.to_string() }
+}
+
 /// Open a folder or file with the system's default handler.
 pub fn open_path(path: &std::path::Path) {
     #[cfg(windows)]
