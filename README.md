@@ -54,7 +54,7 @@ Download the latest build from the [releases page](https://github.com/ulaas/wall
 | Any Linux | `walle-linux-x64.tar.gz` | Unpack it and run `./walle`. |
 | macOS 11 or newer, Apple Silicon | `walle-macos-arm64.dmg` | Open it and drag walle to Applications. |
 
-The Windows files are not code-signed, so SmartScreen may ask before the first start. The Mac app is signed ad hoc, not with an Apple Developer ID, so macOS refuses the first start: open *System Settings > Privacy & Security* and click *Open Anyway* next to walle (or run `xattr -dr com.apple.quarantine /Applications/walle.app`). On Linux walle needs the usual X11 or Wayland, `libxkbcommon` and GL libraries, which a desktop system already has.
+The Windows files are not code-signed, so SmartScreen may ask before the first start. The Mac disk image is signed with an Apple Developer ID and notarized, so it opens without a warning. On Linux walle needs the usual X11 or Wayland, `libxkbcommon` and GL libraries, which a desktop system already has.
 
 Each release comes with `SHA256SUMS.txt` to check the download against.
 
@@ -81,7 +81,7 @@ cargo run --release
 
 On Linux you need the usual egui system libraries (X11/Wayland, `libxkbcommon`, GL). On macOS you need Xcode's command line tools (`xcode-select --install`).
 
-To pack walle the way a release does, run `scripts/package.sh <version> <platform>`. On a Mac, `scripts/package-macos.sh` builds for Apple Silicon (`aarch64-apple-darwin`), assembles `walle.app` with its icon, signs it ad hoc and writes `dist/walle-macos-arm64.dmg`. It needs `rsvg-convert` for the icon (`brew install librsvg`). Set `MACOS_SIGN_IDENTITY` to a Developer ID Application identity to sign with it instead, and `MACOS_NOTARY_PROFILE` to a `notarytool` keychain profile to notarize the disk image as well.
+To pack walle the way a release does, run `scripts/package.sh <version> <platform>`. On a Mac, `scripts/package-macos.sh` builds for Apple Silicon (`aarch64-apple-darwin`), assembles `walle.app` with its icon, signs it ad hoc and writes `dist/walle-macos-arm64.dmg`. It needs `rsvg-convert` for the icon (`brew install librsvg`). Set `MACOS_SIGN_IDENTITY` to a Developer ID Application identity to sign with it instead, and `MACOS_NOTARY_PROFILE` to a `notarytool` keychain profile to notarize the disk image as well. The release workflow does both when the repository has the `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `MACOS_CODESIGN_IDENTITY` and `MACOS_NOTARY_KEY_P8` / `_KEY_ID` / `_ISSUER` (App Store Connect API key) secrets; without them it signs ad hoc.
 
 ## API keys
 
