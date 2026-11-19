@@ -984,6 +984,7 @@ pub enum Staged {
     /// A verified installer and its SHA-256, to run once walle has closed.
     Installer(PathBuf, String),
     /// The new walle.app is in place of the old one; opening it once walle has quit finishes the update.
+    #[cfg(target_os = "macos")]
     Bundle(PathBuf),
 }
 
@@ -1100,11 +1101,6 @@ fn open_bundle(app: &Path) -> Result<(), String> {
     macos::open_after_exit(app, &env).map_err(|e| {
         format!("The new version is installed, but {e}. Quit walle and open it again to finish the update.")
     })
-}
-
-#[cfg(not(target_os = "macos"))]
-fn open_bundle(_: &Path) -> Result<(), String> {
-    Err("There is no update to restart into.".into())
 }
 
 /// Start the new executable; if it does not start, put the previous one back.
@@ -1483,6 +1479,7 @@ impl Updater {
         let result = match (&self.staged, &self.exe) {
             (Some(Staged::Swapped(swap)), _) => start_new(swap),
             (Some(Staged::Installer(msi, sha256)), Some(exe)) => start_installer(msi, sha256, exe),
+            #[cfg(target_os = "macos")]
             (Some(Staged::Bundle(app)), _) => open_bundle(app),
             _ => Err("There is no update to restart into.".into()),
         };
